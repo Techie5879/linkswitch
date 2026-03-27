@@ -3,7 +3,7 @@ name: native-macos-link-router
 overview: Build a small AppKit macOS URL-handler app that routes links by source app, forwards most links to a user-chosen fallback browser, and supports a Helium Chromium-profile override for work links.
 todos:
   - id: bootstrap-appkit-app
-    content: Create a native AppKit macOS app target with Info.plist URL-scheme declarations for http/https and a minimal preferences window.
+    content: Use the existing Xcode-generated macOS AppKit target as the base, then add Info.plist URL-scheme declarations for http/https and a minimal preferences window.
     status: pending
   - id: define-config-model
     content: Define the scoped config model for fallback browser selection and source-app override rules, persisted as JSON or plist.
@@ -81,12 +81,20 @@ isProject: true
 ## Source-of-truth paths and assumptions
 
 - Plan file: `.cursor/plans/native-macos-link-router.plan.md`
-- Proposed app root: repo root (`./`)
-- Proposed modules:
-  - `App/`
-  - `Core/`
-  - `Tests/`
-  - `Fixtures/`
+- Xcode project: `LinkSwitch/LinkSwitch.xcodeproj`
+- App target root: `LinkSwitch/LinkSwitch/`
+- Unit tests target root: `LinkSwitch/LinkSwitchTests/`
+- UI tests target root: `LinkSwitch/LinkSwitchUITests/`
+- Keep working from the generated Xcode layout rather than introducing a parallel repo-root source tree.
+- Preferred folders inside the app target:
+  - `LinkSwitch/LinkSwitch/App/`
+  - `LinkSwitch/LinkSwitch/Core/Config/`
+  - `LinkSwitch/LinkSwitch/Core/Routing/`
+  - `LinkSwitch/LinkSwitch/Core/Launch/`
+  - `LinkSwitch/LinkSwitch/UI/`
+  - `LinkSwitch/LinkSwitch/Support/`
+- Shared router/config types should live in one place inside `Core/Config/` and be imported elsewhere as needed; do not redefine the same types or interfaces near feature code.
+- Keep nesting shallow. Add folders only when they buy clarity in Xcode and in the target, not to mirror an abstract architecture diagram.
 - Persist user config under the app container or Application Support as a small JSON/plist file.
 - Store the fallback browser explicitly; do not rely on asking Launch Services for the default browser after this app becomes the handler.
 
@@ -173,18 +181,29 @@ Incoming URL
 
 ## Module design
 
-- `LaunchServicesBridge`
-  - wraps handler lookup, onboarding, and target-app resolution
-- `URLIntakeController`
-  - converts `application(_:open:)` input into `IncomingOpenContext`
-- `SourceAppResolver`
-  - best-effort sender extraction and normalization to bundle ID
-- `RuleEngine`
-  - resolves `IncomingOpenContext` to `BrowserTarget`
-- `BrowserLauncher`
-  - default-browser forwarding plus `HeliumLauncher`
-- `PreferencesWindowController`
-  - fallback browser selection, rule CRUD, test launch buttons
+- Keep the code organized inside `LinkSwitch/LinkSwitch/` and let the Xcode target structure drive the file layout.
+- `App/`
+  - `AppDelegate`
+  - app coordinator / menu wiring / preferences presentation
+- `Core/Config/`
+  - `RouterConfig`
+  - `SourceAppRule`
+  - `BrowserTarget`
+  - any shared router-facing types kept in one file cluster as the single source of truth
+- `Core/Routing/`
+  - `IncomingOpenContext`
+  - `URLIntakeController`
+  - `SourceAppResolver`
+  - `RuleEngine`
+- `Core/Launch/`
+  - `LaunchServicesBridge`
+  - `BrowserLauncher`
+  - `HeliumLauncher`
+- `UI/`
+  - `PreferencesWindowController`
+  - small AppKit views/controllers for fallback browser selection, rule CRUD, and test launches
+- `Support/`
+  - narrow helpers only when needed; do not turn this into a dumping ground
 
 ## Testing harness
 
@@ -193,8 +212,10 @@ Incoming URL
   - rule matching by source bundle ID
   - Helium launch argument generation
 - Fixture apps:
-  - `SenderHarness.app` to simulate a Slack-like sender bundle ID and call URL open APIs
-  - `CaptureBrowser.app` to record incoming URLs and launch arguments to a temp file
+  - add them as extra targets inside `LinkSwitch/LinkSwitch.xcodeproj` only when the core routing tests are already in place
+  - source can live under `LinkSwitch/Fixtures/` if and when those targets are added
+  - `SenderHarness.app` simulates a Slack-like sender bundle ID and calls URL open APIs
+  - `CaptureBrowser.app` records incoming URLs and launch arguments to a temp file
 - Integration tests:
   - run the router against a test-only scheme like `linkroutertest://` to avoid mutating the machine's real browser defaults during CI/local automation
   - verify `SenderHarness.app -> router -> CaptureBrowser.app` flow
@@ -208,7 +229,7 @@ Incoming URL
 
 ## Deliverables
 
-- Native AppKit app target at the repo root
+- Native AppKit app target in `LinkSwitch/LinkSwitch.xcodeproj`
 - Config model and source-app rule engine
 - Helium work-profile launcher adapter
 - Preferences UI for fallback browser and source-app rules
