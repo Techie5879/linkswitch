@@ -63,6 +63,27 @@ Current development choice:
 - production log destination is deferred in `docs/deferred-user-gated-todos.md`
 - App Sandbox is disabled during the current development phase so repo-local logging works
 
+### Add a Launch Services and browser-launch TDD slice
+
+Reason:
+
+- The next planned milestone after the pure-core model is to bridge real macOS app resolution and browser launching without taking on URL-handler registration or sender-resolution work yet.
+- The launch layer needs a test seam around `NSWorkspace` so fallback-browser forwarding and Helium-specific profile launching can be verified without launching real apps during unit tests.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/Core/Launch/LaunchServicesBridge.swift`
+- `LinkSwitch/LinkSwitch/Core/Launch/BrowserLauncher.swift`
+- `LinkSwitch/LinkSwitchTests/LaunchServicesBridgeTests.swift`
+- `LinkSwitch/LinkSwitchTests/BrowserLauncherTests.swift`
+
+Current shape:
+
+- `LaunchServicesBridge` resolves the current handler bundle ID for a URL scheme, resolves installed app URLs by bundle ID, and wraps default-handler registration for URL schemes.
+- `BrowserLauncher` forwards fallback-browser opens through `NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`.
+- Helium launching stays browser-specific and uses `NSWorkspace.openApplication(at:configuration:completionHandler:)` with the generated Chromium-style profile arguments.
+- The launch layer logs important inputs, resolved app paths, launch arguments, and registration failures, and those log lines are visible in `logs/runtime.log` during tests.
+
 ## Source references
 
 - Plan: `.cursor/plans/native-macos-link-router.plan.md`
