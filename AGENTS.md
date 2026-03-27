@@ -19,6 +19,15 @@ Single routing pipeline for incoming URLs. Sender detection is fragile; document
 ## Workflow
 
 TDD where practical: tests updated with code and must pass before done. Subagents OK for parallel work; primary agent integrates and **verifies** subagent changes.
+- If the next step requires the user to do something in Xcode UI, stop and ask for that action explicitly, then wait for the user to confirm it is done before continuing implementation.
+
+## Observability
+
+- Add detailed logging early instead of waiting for a bug to force it later.
+- Prefer logging the important inputs, decisions, outputs, and failures for routing, config I/O, Launch Services interactions, browser launches, and test/integration flows.
+- During the current development phase, keep runtime log artifacts project-local when possible so they are easy to inspect. Production log destination changes must be explicitly requested.
+- When running builds or tests, preserve and reference the command output so logs remain available for later debugging. If Xcode swallows test stdout, also use the runtime log artifact produced by the app/code under test.
+- Do not hide missing data or unexpected states behind silent behavior. Log them explicitly, then surface the error or route according to the current rules.
 
 ## Editing
 

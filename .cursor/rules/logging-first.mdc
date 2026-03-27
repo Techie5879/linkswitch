@@ -1,0 +1,12 @@
+---
+description: Logging-first observability guidance
+alwaysApply: true
+---
+
+# Logging First
+
+- Add detailed logging early for new behavior instead of waiting for a later debugging session.
+- Log important inputs, decisions, outputs, and failures for routing, config I/O, Launch Services calls, browser launches, and tests.
+- During active development, prefer project-local runtime log artifacts so they are easy to inspect.
+- Prefer logs that stay visible in build and test command output so they can be referenced later. If XCTest does not surface them directly, write a runtime log artifact as well.
+- Do not replace errors with silent behavior. Log the state clearly, then surface the failure or follow the current explicit rule.

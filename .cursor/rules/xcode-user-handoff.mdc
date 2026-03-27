@@ -1,0 +1,10 @@
+---
+description: Stop for required Xcode UI actions
+alwaysApply: true
+---
+
+# Xcode User Handoff
+
+- If progress requires the user to do something in Xcode UI, stop and ask for that action explicitly.
+- Do not continue implementation past that point until the user confirms the Xcode step is done.
+- When asking for the Xcode action, be concrete about exactly what to click or toggle.
