@@ -23,12 +23,13 @@ final class LinkSwitchUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testPreferencesWindowOpensFromKeyboardShortcut() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        app.buttons["Open Preferences…"].click()
+
+        XCTAssertTrue(app.windows["LinkSwitch Preferences"].waitForExistence(timeout: 2.0))
     }
 
     @MainActor

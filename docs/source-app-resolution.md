@@ -10,17 +10,25 @@ AppKit's `NSApplicationDelegate.application(_:open:)` only gives the app and the
 
 That means sender detection is not part of the direct AppKit URL-open API contract and must be derived from the underlying Apple Event path when available.
 
-## Current implementation direction
+## Current implementation
 
-Use the Apple Event for the URL open path as the authoritative place to inspect sender metadata.
+LinkSwitch now resolves sender metadata synchronously inside `AppDelegate.application(_:open:)` before it hops into the async URL-intake pipeline.
 
-Current recommendation:
+Current behavior:
 
-1. treat incoming URL opens as `kAEGetURL`
-2. read the sender PID from the Apple Event when available
-3. map PID to `NSRunningApplication`
-4. read `bundleIdentifier`
-5. keep `sourceBundleID` optional because metadata can be absent or misleading
+1. treat incoming URL opens as the Apple Event-backed `kAEGetURL` path
+2. read the current Apple Event from `NSAppleEventManager.shared().currentAppleEvent`
+3. read `keySenderPIDAttr` when available
+4. map the PID to `NSRunningApplication`
+5. read `bundleIdentifier`
+6. pass the resolved bundle ID, or `nil`, into `URLIntakeController`
+
+Implementation files:
+
+- `LinkSwitch/LinkSwitch/Core/Routing/SourceAppResolver.swift`
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitchTests/SourceAppResolverTests.swift`
+- `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
 
 ## Why this direction
 
@@ -30,7 +38,7 @@ Current recommendation:
 
 ## Known limits
 
-- `application(_:open:)` itself does not expose the sender.
+- `application(_:open:)` itself does not expose the sender, which is why resolution has to happen against the current Apple Event before async work begins.
 - Apple Event access may be unavailable or incomplete in some launch paths.
 - The sending PID may represent an intermediary process rather than the human-visible app.
 - The sender process may exit before mapping succeeds.

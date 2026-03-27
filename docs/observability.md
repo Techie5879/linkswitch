@@ -53,5 +53,10 @@ Logging has been added to:
 
 - app lifecycle in `AppDelegate`
 - config path resolution, load, and save in `RouterConfigStore`
+- source-app sender resolution in `SourceAppResolver`
 - route selection in `RuleEngine`
+- preferences loading, validation, save, and test-launch flows in `PreferencesModel`
+- default-handler lookup and registration in `LaunchServicesBridge`
+- browser forwarding in `BrowserLauncher`
+- URL intake orchestration in `URLIntakeController`
 - Helium launch argument generation in `HeliumLaunchArguments`

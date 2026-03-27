@@ -9,6 +9,10 @@ protocol BrowserLaunching {
     func open(_ url: URL, target: BrowserTarget, config: RouterConfig) async throws
 }
 
+protocol URLIntakeHandling {
+    func handle(urls: [URL], sourceBundleID: String?) async throws
+}
+
 enum URLIntakeControllerError: Error, Equatable {
     case missingConfig
 }
@@ -61,3 +65,4 @@ struct URLIntakeController {
 
 extension RouterConfigStore: RouterConfigLoading {}
 extension BrowserLauncher: BrowserLaunching {}
+extension URLIntakeController: URLIntakeHandling {}
