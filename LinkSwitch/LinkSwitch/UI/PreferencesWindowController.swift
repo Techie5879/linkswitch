@@ -3,6 +3,12 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class PreferencesWindowController: NSWindowController {
+    private enum StatusStyle {
+        case normal
+        case warning
+        case error
+    }
+
     private let model: PreferencesModel
 
     private let configPathLabel = NSTextField(wrappingLabelWithString: "")
@@ -265,9 +271,19 @@ final class PreferencesWindowController: NSWindowController {
 
         Task { @MainActor [weak self] in
             do {
-                try await self?.model.registerLinkSwitchAsDefaultHandler(applicationURL: applicationURL)
+                let result = try await self?.model.registerLinkSwitchAsDefaultHandler(applicationURL: applicationURL)
                 self?.refreshUI()
-                self?.setStatus("Requested LinkSwitch as the default handler for http and https.")
+                switch result {
+                case .registered:
+                    self?.setStatus("Registered LinkSwitch as the default handler for http and https.")
+                case .alreadyRegistered:
+                    self?.setStatus(
+                        "LinkSwitch is already the current handler for http and https.",
+                        style: .warning
+                    )
+                case nil:
+                    break
+                }
             } catch {
                 self?.presentPreferencesError(error, message: "Could not register LinkSwitch as the default handler.")
             }
@@ -290,14 +306,21 @@ final class PreferencesWindowController: NSWindowController {
         model.sampleURLString = sampleURLField.stringValue
     }
 
-    private func setStatus(_ message: String, isError: Bool = false) {
+    private func setStatus(_ message: String, style: StatusStyle = .normal) {
         statusLabel.stringValue = message
-        statusLabel.textColor = isError ? .systemRed : .secondaryLabelColor
+        switch style {
+        case .normal:
+            statusLabel.textColor = .secondaryLabelColor
+        case .warning:
+            statusLabel.textColor = .systemYellow
+        case .error:
+            statusLabel.textColor = .systemRed
+        }
     }
 
     private func presentPreferencesError(_ error: Error, message: String) {
         AppLogger.error("\(message) \(error)", category: .app)
-        setStatus(message, isError: true)
+        setStatus(message, style: .error)
 
         let alert = NSAlert()
         alert.messageText = message

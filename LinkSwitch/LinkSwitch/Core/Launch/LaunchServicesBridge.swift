@@ -7,6 +7,11 @@ enum LaunchServicesBridgeError: Error, Equatable {
     case setDefaultHandlerFailed(urlScheme: String, message: String)
 }
 
+enum DefaultHandlerRegistrationResult: Equatable {
+    case alreadyRegistered
+    case registered
+}
+
 protocol LaunchServicesProviding {
     func defaultHandlerBundleID(forURLScheme urlScheme: String) -> String?
     func applicationURL(forBundleIdentifier bundleID: String) -> URL?
@@ -52,15 +57,30 @@ struct LaunchServicesBridge {
         return applicationURL
     }
 
-    func setDefaultHandler(applicationURL: URL, urlSchemes: [String]) async throws {
+    func setDefaultHandler(
+        applicationURL: URL,
+        applicationBundleIdentifier: String,
+        urlSchemes: [String]
+    ) async throws -> DefaultHandlerRegistrationResult {
         AppLogger.info(
-            "Setting default handler \(applicationURL.path()) for URL schemes \(urlSchemes)",
+            "Setting default handler \(applicationURL.path()) with bundle ID \(applicationBundleIdentifier) for URL schemes \(urlSchemes)",
             category: .launch
         )
 
+        var didRegisterAnyScheme = false
+
         for urlScheme in urlSchemes {
+            if provider.defaultHandlerBundleID(forURLScheme: urlScheme) == applicationBundleIdentifier {
+                AppLogger.info(
+                    "Default handler for URL scheme \(urlScheme) is already \(applicationBundleIdentifier); skipping registration",
+                    category: .launch
+                )
+                continue
+            }
+
             do {
                 try await provider.setDefaultHandler(applicationURL: applicationURL, urlScheme: urlScheme)
+                didRegisterAnyScheme = true
                 AppLogger.info(
                     "Set default handler \(applicationURL.path()) for URL scheme \(urlScheme)",
                     category: .launch
@@ -76,6 +96,16 @@ struct LaunchServicesBridge {
                 )
             }
         }
+
+        if didRegisterAnyScheme {
+            return .registered
+        }
+
+        AppLogger.info(
+            "Default handler was already \(applicationBundleIdentifier) for all requested URL schemes \(urlSchemes)",
+            category: .launch
+        )
+        return .alreadyRegistered
     }
 }
 

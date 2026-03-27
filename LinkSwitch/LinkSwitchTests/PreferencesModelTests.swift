@@ -196,10 +196,14 @@ final class PreferencesModelTests: XCTestCase {
             configFileURLDescription: "/tmp/router-config.json",
             launchServicesBridge: LaunchServicesBridge(provider: provider)
         )
-        let applicationURL = URL(fileURLWithPath: "/Applications/LinkSwitch.app")
+        let applicationURL = try makeApplicationBundle(
+            name: "LinkSwitch",
+            bundleIdentifier: "dev.helios.LinkSwitch"
+        )
 
-        try await model.registerLinkSwitchAsDefaultHandler(applicationURL: applicationURL)
+        let result = try await model.registerLinkSwitchAsDefaultHandler(applicationURL: applicationURL)
 
+        XCTAssertEqual(result, .registered)
         XCTAssertEqual(
             provider.defaultHandlerSetCalls,
             [
@@ -207,6 +211,28 @@ final class PreferencesModelTests: XCTestCase {
                 PreferencesLaunchServicesProviderSpy.SetCall(applicationURL: applicationURL, urlScheme: "https"),
             ]
         )
+    }
+
+    @MainActor
+    func testRegisterLinkSwitchAsDefaultHandlerReturnsAlreadyRegisteredWhenBothSchemesAlreadyMatch() async throws {
+        let provider = PreferencesLaunchServicesProviderSpy()
+        provider.defaultHandlerBundleIDsByScheme["http"] = "dev.helios.LinkSwitch"
+        provider.defaultHandlerBundleIDsByScheme["https"] = "dev.helios.LinkSwitch"
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchServicesBridge: LaunchServicesBridge(provider: provider)
+        )
+        let applicationURL = try makeApplicationBundle(
+            name: "LinkSwitch",
+            bundleIdentifier: "dev.helios.LinkSwitch"
+        )
+
+        let result = try await model.registerLinkSwitchAsDefaultHandler(applicationURL: applicationURL)
+
+        XCTAssertEqual(result, .alreadyRegistered)
+        XCTAssertEqual(provider.defaultHandlerSetCalls, [])
     }
 
     private func makeApplicationBundle(name: String, bundleIdentifier: String) throws -> URL {

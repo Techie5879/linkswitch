@@ -28,13 +28,13 @@ struct RouterConfigStore {
         )
         let configDirectory = applicationSupportDirectory.appendingPathComponent("LinkSwitch", isDirectory: true)
         let configFileURL = configDirectory.appendingPathComponent("router-config.json", isDirectory: false)
-        AppLogger.debug("Resolved default config path: \(configFileURL.path())", category: .config)
+        AppLogger.debug("Resolved default config path: \(configFileURL.path(percentEncoded: false))", category: .config)
         return configFileURL
     }
 
     func load() throws -> RouterConfig? {
-        AppLogger.info("Loading router config from \(configFileURL.path())", category: .config)
-        guard fileManager.fileExists(atPath: configFileURL.path()) else {
+        AppLogger.info("Loading router config from \(configFileURL.path(percentEncoded: false))", category: .config)
+        guard fileManager.fileExists(atPath: configFileURL.path(percentEncoded: false)) else {
             AppLogger.info("Router config file does not exist yet", category: .config)
             return nil
         }
@@ -50,7 +50,7 @@ struct RouterConfigStore {
 
     func save(_ config: RouterConfig) throws {
         let directoryURL = configFileURL.deletingLastPathComponent()
-        AppLogger.info("Saving router config to \(configFileURL.path())", category: .config)
+        AppLogger.info("Saving router config to \(configFileURL.path(percentEncoded: false))", category: .config)
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
 
         let data = try encoder.encode(config)

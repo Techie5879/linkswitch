@@ -22,7 +22,7 @@ final class BrowserLauncherTests: XCTestCase {
                 ),
             ]
         )
-        XCTAssertTrue(workspaceLauncher.openApplicationCalls.isEmpty)
+        XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
     func testOpenHeliumResolvesAppURLAndLaunchesWithProfileArguments() async throws {
@@ -45,9 +45,9 @@ final class BrowserLauncherTests: XCTestCase {
 
         XCTAssertEqual(provider.applicationURLRequests, [BrowserLauncher.heliumBundleID])
         XCTAssertEqual(
-            workspaceLauncher.openApplicationCalls,
+            workspaceLauncher.launchApplicationExecutableCalls,
             [
-                WorkspaceLaunchSpy.OpenApplicationCall(
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
                     applicationURL: heliumApplicationURL,
                     arguments: [
                         "--profile-directory=Profile 1",
@@ -119,19 +119,21 @@ private final class WorkspaceLaunchSpy: WorkspaceLaunching {
         let applicationURL: URL
     }
 
-    struct OpenApplicationCall: Equatable {
+    struct LaunchApplicationExecutableCall: Equatable {
         let applicationURL: URL
         let arguments: [String]
     }
 
     private(set) var openURLCalls: [OpenURLCall] = []
-    private(set) var openApplicationCalls: [OpenApplicationCall] = []
+    private(set) var launchApplicationExecutableCalls: [LaunchApplicationExecutableCall] = []
 
     func openURLs(_ urls: [URL], withApplicationAt applicationURL: URL) async throws {
         openURLCalls.append(OpenURLCall(urls: urls, applicationURL: applicationURL))
     }
 
-    func openApplication(at applicationURL: URL, arguments: [String]) async throws {
-        openApplicationCalls.append(OpenApplicationCall(applicationURL: applicationURL, arguments: arguments))
+    func launchApplicationExecutable(at applicationURL: URL, arguments: [String]) async throws {
+        launchApplicationExecutableCalls.append(
+            LaunchApplicationExecutableCall(applicationURL: applicationURL, arguments: arguments)
+        )
     }
 }

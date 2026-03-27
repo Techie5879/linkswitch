@@ -19,6 +19,7 @@ struct PreferencesRuleDraft: Equatable {
 enum PreferencesModelError: Error, Equatable {
     case missingFallbackBrowserSelection
     case fallbackBrowserBundleIdentifierNotFound(applicationURL: URL)
+    case linkSwitchBundleIdentifierNotFound(applicationURL: URL)
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
@@ -174,10 +175,16 @@ final class PreferencesModel {
         }
     }
 
-    func registerLinkSwitchAsDefaultHandler(applicationURL: URL) async throws {
+    func registerLinkSwitchAsDefaultHandler(applicationURL: URL) async throws -> DefaultHandlerRegistrationResult {
         AppLogger.info("Registering LinkSwitch as the default handler for http/https from preferences", category: .launch)
-        try await launchServicesBridge.setDefaultHandler(
+        guard let bundleIdentifier = Bundle(url: applicationURL)?.bundleIdentifier else {
+            AppLogger.error("Could not resolve LinkSwitch bundle identifier from \(applicationURL.path())", category: .launch)
+            throw PreferencesModelError.linkSwitchBundleIdentifierNotFound(applicationURL: applicationURL)
+        }
+
+        return try await launchServicesBridge.setDefaultHandler(
             applicationURL: applicationURL,
+            applicationBundleIdentifier: bundleIdentifier,
             urlSchemes: ["http", "https"]
         )
     }

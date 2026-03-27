@@ -4,7 +4,7 @@ import XCTest
 final class LaunchServicesBridgeTests: XCTestCase {
     func testDefaultHandlerBundleIDReturnsResolvedBundleID() throws {
         let provider = LaunchServicesProviderSpy()
-        provider.defaultHandlerBundleIDResult = "com.apple.Safari"
+        provider.defaultHandlerBundleIDByScheme["https"] = "com.apple.Safari"
         let bridge = LaunchServicesBridge(provider: provider)
 
         XCTAssertEqual(
@@ -58,12 +58,56 @@ final class LaunchServicesBridgeTests: XCTestCase {
         let provider = LaunchServicesProviderSpy()
         let bridge = LaunchServicesBridge(provider: provider)
 
-        try await bridge.setDefaultHandler(applicationURL: applicationURL, urlSchemes: ["http", "https"])
+        let result = try await bridge.setDefaultHandler(
+            applicationURL: applicationURL,
+            applicationBundleIdentifier: "dev.helios.LinkSwitch",
+            urlSchemes: ["http", "https"]
+        )
 
+        XCTAssertEqual(result, .registered)
         XCTAssertEqual(
             provider.defaultHandlerSetCalls,
             [
                 LaunchServicesProviderSpy.SetCall(applicationURL: applicationURL, urlScheme: "http"),
+                LaunchServicesProviderSpy.SetCall(applicationURL: applicationURL, urlScheme: "https"),
+            ]
+        )
+    }
+
+    func testSetDefaultHandlerReturnsAlreadyRegisteredWhenAllSchemesAlreadyMatch() async throws {
+        let applicationURL = URL(fileURLWithPath: "/Applications/LinkSwitch.app")
+        let provider = LaunchServicesProviderSpy()
+        provider.defaultHandlerBundleIDByScheme["http"] = "dev.helios.LinkSwitch"
+        provider.defaultHandlerBundleIDByScheme["https"] = "dev.helios.LinkSwitch"
+        let bridge = LaunchServicesBridge(provider: provider)
+
+        let result = try await bridge.setDefaultHandler(
+            applicationURL: applicationURL,
+            applicationBundleIdentifier: "dev.helios.LinkSwitch",
+            urlSchemes: ["http", "https"]
+        )
+
+        XCTAssertEqual(result, .alreadyRegistered)
+        XCTAssertEqual(provider.defaultHandlerSetCalls, [])
+    }
+
+    func testSetDefaultHandlerSkipsAlreadyRegisteredSchemes() async throws {
+        let applicationURL = URL(fileURLWithPath: "/Applications/LinkSwitch.app")
+        let provider = LaunchServicesProviderSpy()
+        provider.defaultHandlerBundleIDByScheme["http"] = "dev.helios.LinkSwitch"
+        provider.defaultHandlerBundleIDByScheme["https"] = "app.zen-browser.zen"
+        let bridge = LaunchServicesBridge(provider: provider)
+
+        let result = try await bridge.setDefaultHandler(
+            applicationURL: applicationURL,
+            applicationBundleIdentifier: "dev.helios.LinkSwitch",
+            urlSchemes: ["http", "https"]
+        )
+
+        XCTAssertEqual(result, .registered)
+        XCTAssertEqual(
+            provider.defaultHandlerSetCalls,
+            [
                 LaunchServicesProviderSpy.SetCall(applicationURL: applicationURL, urlScheme: "https"),
             ]
         )
@@ -77,6 +121,7 @@ final class LaunchServicesBridgeTests: XCTestCase {
         do {
             try await bridge.setDefaultHandler(
                 applicationURL: URL(fileURLWithPath: "/Applications/LinkSwitch.app"),
+                applicationBundleIdentifier: "dev.helios.LinkSwitch",
                 urlSchemes: ["http", "https"]
             )
             XCTFail("Expected setDefaultHandler to throw")
@@ -97,7 +142,7 @@ private final class LaunchServicesProviderSpy: LaunchServicesProviding {
         let urlScheme: String
     }
 
-    var defaultHandlerBundleIDResult: String?
+    var defaultHandlerBundleIDByScheme: [String: String] = [:]
     var applicationURLResult: URL?
     var setDefaultHandlerErrorByScheme: [String: Error] = [:]
 
@@ -107,7 +152,7 @@ private final class LaunchServicesProviderSpy: LaunchServicesProviding {
 
     func defaultHandlerBundleID(forURLScheme urlScheme: String) -> String? {
         defaultHandlerBundleIDRequests.append(urlScheme)
-        return defaultHandlerBundleIDResult
+        return defaultHandlerBundleIDByScheme[urlScheme]
     }
 
     func applicationURL(forBundleIdentifier bundleID: String) -> URL? {
