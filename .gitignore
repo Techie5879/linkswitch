@@ -38,3 +38,6 @@ Dependencies/
 
 # IDEs (optional local tooling)
 .idea/
+
+# Local development logs
+logs/
