@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1C29" />
+      <stop offset="100%" stop-color="#0A0B10" />
+    </linearGradient>
+    <linearGradient id="app1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E01E5A" />
+      <stop offset="50%" stop-color="#36C5F0" />
+      <stop offset="100%" stop-color="#2EB67D" />
+    </linearGradient>
+    <linearGradient id="app2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#007AFF" />
+      <stop offset="100%" stop-color="#5856D6" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="230" fill="url(#bgGrad)" />
+  <rect width="1024" height="1024" rx="230" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="8" />
+
+  <!-- App Portals -->
+  <g filter="url(#shadow)">
+    <rect x="604" y="220" width="280" height="240" rx="48" fill="url(#app1)" />
+    <circle cx="648" cy="268" r="14" fill="#FFFFFF" opacity="0.8" />
+    <rect x="682" y="260" width="120" height="16" rx="8" fill="#FFFFFF" opacity="0.4" />
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="604" y="564" width="280" height="240" rx="48" fill="url(#app2)" />
+    <circle cx="648" cy="612" r="14" fill="#FFFFFF" opacity="0.8" />
+    <rect x="682" y="604" width="120" height="16" rx="8" fill="#FFFFFF" opacity="0.4" />
+  </g>
+
+  <!-- SWITCH 8: Neon Grid Router -->
+  <!-- Strict 90 degree paths -->
+  <path d="M 240 512 L 240 340 L 604 340" stroke="#4A4A5A" stroke-width="12" fill="none" stroke-dasharray="16 16" />
+  <path d="M 240 512 L 240 684 L 604 684" stroke="#00C2FF" stroke-width="16" fill="none" />
+  
+  <g filter="url(#shadow)">
+    <!-- Circuit Box -->
+    <rect x="180" y="452" width="120" height="120" rx="16" fill="#151620" stroke="#00C2FF" stroke-width="4" />
+    
+    <!-- Incoming trace -->
+    <path d="M 80 512 L 180 512" stroke="#00C2FF" stroke-width="16" fill="none" />
+    
+    <!-- CPU/Chip detail -->
+    <rect x="216" y="488" width="48" height="48" fill="#00C2FF" />
+    <rect x="228" y="500" width="24" height="24" fill="#FFFFFF" />
+  </g>
+</svg>

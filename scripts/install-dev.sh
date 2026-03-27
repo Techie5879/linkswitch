@@ -30,6 +30,9 @@ echo "==> Repo root: ${REPO_ROOT}"
 echo "==> Cleaning previous derived data at ${DERIVED_DATA_PATH}"
 rm -rf "${DERIVED_DATA_PATH}"
 
+echo "==> Regenerating app icon assets from ${REPO_ROOT}/app-icon.svg"
+"${REPO_ROOT}/scripts/build-app-icon.sh"
+
 echo "==> Building ${SCHEME} (${CONFIGURATION})"
 
 xcodebuild \
