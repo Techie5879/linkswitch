@@ -101,8 +101,68 @@ Current shape:
 
 - `URLIntakeController` loads the saved router config, creates `IncomingOpenContext` values, runs each URL through `RuleEngine`, and delegates the actual open to `BrowserLauncher`.
 - `AppDelegate.application(_:open:)` now logs incoming AppKit URL opens and routes them through `URLIntakeController`.
-- Sender resolution is still intentionally pending, so the AppKit path currently feeds `sourceBundleID = nil` until the Apple Event slice is implemented.
+- That initial intake slice was built with `sourceBundleID = nil`; the later Apple Event sender-resolution slice now fills that value before async intake begins.
 - Missing config is surfaced as an explicit intake error and logged, which keeps the current no-fallback rule intact.
+
+### Add the Apple Event sender-resolution slice
+
+Reason:
+
+- The core behavior depends on real sender metadata so source-app rules can differentiate `Slack -> Helium` from normal fallback forwarding.
+- `NSApplicationDelegate.application(_:open:)` does not expose a sender directly, so the app must resolve sender metadata from the current Apple Event before the async intake task starts.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/Core/Routing/SourceAppResolver.swift`
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitchTests/SourceAppResolverTests.swift`
+- `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
+
+Current shape:
+
+- `SourceAppResolver` reads the current Apple Event, extracts `keySenderPIDAttr`, maps that PID to `NSRunningApplication`, and returns an optional bundle ID.
+- `AppDelegate.application(_:open:)` now resolves the sender synchronously before it enters the async intake pipeline, which avoids losing Apple Event metadata after the stack unwinds.
+- Missing sender metadata stays explicit and logged; the routing layer still treats `sourceBundleID` as optional and falls back only through the configured fallback-browser rule path.
+
+### Add a preferences and registration slice
+
+Reason:
+
+- The app now needs an actual operator-facing surface to choose the fallback browser, manage source-app rules, test launches, and request default-handler registration without editing config files by hand.
+- URL-handler registration also needs real bundle URL declarations for `http` and `https` so Launch Services can recognize LinkSwitch as a web handler.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/UI/PreferencesModel.swift`
+- `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift`
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitch/Info.plist`
+- `LinkSwitch/LinkSwitch.xcodeproj/project.pbxproj`
+- `LinkSwitch/LinkSwitchTests/PreferencesModelTests.swift`
+- `LinkSwitch/LinkSwitchTests/AppBundleConfigurationTests.swift`
+- `LinkSwitch/LinkSwitchUITests/LinkSwitchUITests.swift`
+
+Current shape:
+
+- The main window now exposes an `Open Preferences…` action, and the app menu Preferences item is wired programmatically.
+- `PreferencesWindowController` is code-built and supports fallback-browser selection, source-app rule CRUD, sample-URL test launches, current `http` / `https` handler inspection, and a button that calls `LaunchServicesBridge` to request LinkSwitch as the default web handler.
+- `PreferencesModel` is the testable logic layer behind that UI and owns config loading, validation, persistence, test launches, and default-handler registration requests.
+- The app bundle now declares `http` and `https` in `CFBundleURLTypes`, and a host-bundle test verifies those schemes are present.
+
+### Add in-process routing integration coverage
+
+Reason:
+
+- The plan's eventual fixture-app harness still needs extra Xcode targets, but the current project can already add stronger automated coverage by persisting real config and running the saved router pipeline in-process.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitchTests/RoutingPipelineIntegrationTests.swift`
+
+Current shape:
+
+- The integration tests save config through `PreferencesModel`, reload that same file through a real `RouterConfigStore`, and drive `URLIntakeController` with spy launchers.
+- The current automated coverage now exercises the persistence -> intake -> rule engine -> launch selection path without mutating the machine's real browser defaults during test runs.
 
 ## Source references
 
@@ -118,6 +178,6 @@ Current shape:
 
 These should prefer Xcode UI over hand-editing if needed:
 
-- add URL scheme handling for `http` and `https`
 - confirm app capabilities and signing choices when Launch Services integration begins
 - add fixture app targets later if the project grows beyond the three generated targets
+- run fixture-app target creation for `SenderHarness.app` / `CaptureBrowser.app` if we want the full multi-process harness described in the plan

@@ -4,49 +4,49 @@ overview: Build a small AppKit macOS URL-handler app that routes links by source
 todos:
   - id: bootstrap-appkit-app
     content: Use the existing Xcode-generated macOS AppKit target as the base, then add Info.plist URL-scheme declarations for http/https and a minimal preferences window.
-    status: pending
+    status: completed
   - id: define-config-model
     content: Define the scoped config model for fallback browser selection and source-app override rules, persisted as JSON or plist.
-    status: pending
+    status: completed
   - id: launch-services-bridge
     content: Wrap Launch Services and NSWorkspace APIs for reading the current handler, setting the app as the handler, and resolving browser app URLs.
-    status: pending
+    status: completed
     dependencies:
       - bootstrap-appkit-app
   - id: url-intake-pipeline
     content: Implement URL intake through NSApplicationDelegate and route each incoming URL through a single routing pipeline.
-    status: pending
+    status: completed
     dependencies:
       - bootstrap-appkit-app
       - define-config-model
   - id: source-app-resolution-spike
     content: Prove and document the supported sender-identification approach for incoming URL opens, including failure behavior when source metadata is unavailable.
-    status: pending
+    status: completed
     dependencies:
       - url-intake-pipeline
   - id: browser-launch-adapters
     content: Implement browser launch adapters for fallback-browser forwarding and Helium Chromium-profile forwarding.
-    status: pending
+    status: completed
     dependencies:
       - launch-services-bridge
       - url-intake-pipeline
   - id: rule-engine
     content: Implement the scoped rule engine for source-app bundle ID matching and fallback forwarding.
-    status: pending
+    status: completed
     dependencies:
       - define-config-model
       - source-app-resolution-spike
       - browser-launch-adapters
   - id: preferences-ui
     content: Build the AppKit preferences UI to choose the fallback browser, define source-app rules, and test launches.
-    status: pending
+    status: completed
     dependencies:
       - define-config-model
       - launch-services-bridge
       - rule-engine
   - id: automated-test-harness
     content: Add fixture apps and automated tests for routing, sender detection, and Helium profile launch argument generation.
-    status: pending
+    status: in_progress
     dependencies:
       - rule-engine
   - id: manual-e2e-verification
