@@ -84,6 +84,26 @@ Current shape:
 - Helium launching stays browser-specific and uses `NSWorkspace.openApplication(at:configuration:completionHandler:)` with the generated Chromium-style profile arguments.
 - The launch layer logs important inputs, resolved app paths, launch arguments, and registration failures, and those log lines are visible in `logs/runtime.log` during tests.
 
+### Add a URL-intake controller slice
+
+Reason:
+
+- The app now has enough config, routing, and launch infrastructure to connect AppKit's incoming URL hook to the single routing pipeline without taking on sender-resolution yet.
+- The pipeline should fail explicitly when no saved router config exists rather than guessing a browser or silently dropping the open.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/Core/Routing/URLIntakeController.swift`
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitchTests/URLIntakeControllerTests.swift`
+
+Current shape:
+
+- `URLIntakeController` loads the saved router config, creates `IncomingOpenContext` values, runs each URL through `RuleEngine`, and delegates the actual open to `BrowserLauncher`.
+- `AppDelegate.application(_:open:)` now logs incoming AppKit URL opens and routes them through `URLIntakeController`.
+- Sender resolution is still intentionally pending, so the AppKit path currently feeds `sourceBundleID = nil` until the Apple Event slice is implemented.
+- Missing config is surfaced as an explicit intake error and logged, which keeps the current no-fallback rule intact.
+
 ## Source references
 
 - Plan: `.cursor/plans/native-macos-link-router.plan.md`
