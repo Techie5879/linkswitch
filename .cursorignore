@@ -1,0 +1,9 @@
+# Uses .gitignore syntax (see https://cursor.com/docs/reference/ignore-file).
+# Additive to .gitignore: blocks Agent, Tab, @ mentions, and semantic search for these paths.
+# Terminal and MCP tools are not blocked.
+
+# Build and caches (keep AI context focused on source)
+DerivedData/
+build/
+.build/
+
