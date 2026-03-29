@@ -18,7 +18,9 @@ final class PreferencesModelTests: XCTestCase {
         let model = PreferencesModel(
             configStore: PreferencesConfigStoreStub(loadResult: config),
             browserLauncher: PreferencesBrowserLauncherSpy(),
-            configFileURLDescription: "/tmp/router-config.json"
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
         )
 
         try model.load()
@@ -47,13 +49,99 @@ final class PreferencesModelTests: XCTestCase {
         let model = PreferencesModel(
             configStore: PreferencesConfigStoreStub(loadResult: nil),
             browserLauncher: PreferencesBrowserLauncherSpy(),
-            configFileURLDescription: "/tmp/router-config.json"
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: [])
         )
 
         try model.setFallbackBrowser(applicationURL: applicationURL)
 
         XCTAssertEqual(model.fallbackBrowserBundleID, "com.example.TestBrowser")
         XCTAssertEqual(model.fallbackBrowserAppURL, applicationURL)
+    }
+
+    @MainActor
+    func testSetFallbackBrowserFromDiscoveredBrowserUpdatesBundleIDAndAppURL() {
+        let browserURL = URL(fileURLWithPath: "/Applications/TestBrowser.app")
+        let discovered = DiscoveredBrowser(bundleID: "com.example.TestBrowser", name: "Test Browser", appURL: browserURL)
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: [discovered])
+        )
+
+        model.setFallbackBrowser(discoveredBrowser: discovered)
+
+        XCTAssertEqual(model.fallbackBrowserBundleID, "com.example.TestBrowser")
+        XCTAssertEqual(model.fallbackBrowserAppURL, browserURL)
+    }
+
+    @MainActor
+    func testLoadPopulatesDiscoveredBrowsersFromDiscovery() throws {
+        let browserURL = URL(fileURLWithPath: "/Applications/TestBrowser.app")
+        let discovered = DiscoveredBrowser(bundleID: "com.example.TestBrowser", name: "Test Browser", appURL: browserURL)
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: [discovered]),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
+        )
+
+        try model.load()
+
+        XCTAssertEqual(model.discoveredBrowsers, [discovered])
+    }
+
+    @MainActor
+    func testLoadPopulatesDiscoveredApplicationsFromDiscovery() throws {
+        let appURL = URL(fileURLWithPath: "/Applications/Slack.app")
+        let slack = DiscoveredApplication(bundleID: "com.tinyspeck.slackmacgap", name: "Slack", appURL: appURL)
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [slack])
+        )
+
+        try model.load()
+
+        XCTAssertEqual(model.discoveredApplications, [slack])
+    }
+
+    @MainActor
+    func testRefreshInstalledApplicationsUpdatesApplicationsList() {
+        let appURL = URL(fileURLWithPath: "/Applications/Slack.app")
+        let slack = DiscoveredApplication(bundleID: "com.tinyspeck.slackmacgap", name: "Slack", appURL: appURL)
+        let stub = StubInstalledApplicationDiscovering(applications: [slack])
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            installedApplicationDiscovery: stub
+        )
+
+        XCTAssertTrue(model.discoveredApplications.isEmpty)
+        model.refreshInstalledApplications()
+        XCTAssertEqual(model.discoveredApplications, [slack])
+    }
+
+    @MainActor
+    func testRefreshDiscoveredBrowsersUpdatesDiscoveredBrowsersList() {
+        let browserURL = URL(fileURLWithPath: "/Applications/TestBrowser.app")
+        let discovered = DiscoveredBrowser(bundleID: "com.example.TestBrowser", name: "Test Browser", appURL: browserURL)
+        let stub = StubBrowserDiscovering(browsers: [discovered])
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: stub
+        )
+
+        XCTAssertTrue(model.discoveredBrowsers.isEmpty)
+        model.refreshDiscoveredBrowsers()
+        XCTAssertEqual(model.discoveredBrowsers, [discovered])
     }
 
     @MainActor

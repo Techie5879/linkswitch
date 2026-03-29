@@ -31,23 +31,31 @@ final class PreferencesModel {
     private let configStore: any RouterConfigLoading & RouterConfigSaving
     private let browserLauncher: any BrowserLaunching
     private let launchServicesBridge: LaunchServicesBridge
+    private let browserDiscovery: any BrowserDiscovering
+    private let installedApplicationDiscovery: any InstalledApplicationDiscovering
 
     let configFileURLDescription: String
     var fallbackBrowserBundleID = ""
     var fallbackBrowserAppURL: URL?
     var sampleURLString = "https://example.com"
     private(set) var ruleDrafts: [PreferencesRuleDraft] = []
+    private(set) var discoveredBrowsers: [DiscoveredBrowser] = []
+    private(set) var discoveredApplications: [DiscoveredApplication] = []
 
     init(
         configStore: any RouterConfigLoading & RouterConfigSaving,
         browserLauncher: any BrowserLaunching,
         configFileURLDescription: String,
-        launchServicesBridge: LaunchServicesBridge = LaunchServicesBridge()
+        launchServicesBridge: LaunchServicesBridge = LaunchServicesBridge(),
+        browserDiscovery: any BrowserDiscovering = BrowserDiscovery(),
+        installedApplicationDiscovery: any InstalledApplicationDiscovering = InstalledApplicationDiscovery()
     ) {
         self.configStore = configStore
         self.browserLauncher = browserLauncher
         self.configFileURLDescription = configFileURLDescription
         self.launchServicesBridge = launchServicesBridge
+        self.browserDiscovery = browserDiscovery
+        self.installedApplicationDiscovery = installedApplicationDiscovery
     }
 
     static func live() throws -> PreferencesModel {
@@ -55,13 +63,15 @@ final class PreferencesModel {
         return PreferencesModel(
             configStore: store,
             browserLauncher: BrowserLauncher(),
-            configFileURLDescription: store.configFileURL.path(),
+            configFileURLDescription: store.configFileURL.path(percentEncoded: false),
             launchServicesBridge: LaunchServicesBridge()
         )
     }
 
     func load() throws {
         AppLogger.info("Loading preferences model from \(configFileURLDescription)", category: .config)
+        refreshDiscoveredBrowsers()
+        refreshInstalledApplications()
         guard let config = try configStore.load() else {
             AppLogger.info("No router config exists yet; preferences model will start empty", category: .config)
             fallbackBrowserBundleID = ""
@@ -90,6 +100,33 @@ final class PreferencesModel {
                 )
             }
         }
+    }
+
+    func refreshDiscoveredBrowsers() {
+        let selfBundleID = Bundle.main.bundleIdentifier
+        discoveredBrowsers = browserDiscovery.discoverBrowsers(excludingBundleID: selfBundleID)
+        AppLogger.info(
+            "Refreshed discovered browsers: \(discoveredBrowsers.count) found",
+            category: .config
+        )
+    }
+
+    func refreshInstalledApplications() {
+        let selfBundleID = Bundle.main.bundleIdentifier
+        discoveredApplications = installedApplicationDiscovery.discoverInstalledApplications(excludingBundleID: selfBundleID)
+        AppLogger.info(
+            "Refreshed installed applications: \(discoveredApplications.count) found",
+            category: .config
+        )
+    }
+
+    func setFallbackBrowser(discoveredBrowser: DiscoveredBrowser) {
+        AppLogger.info(
+            "Setting fallback browser from discovered browser \(discoveredBrowser.bundleID) at \(discoveredBrowser.appURL.path())",
+            category: .config
+        )
+        fallbackBrowserBundleID = discoveredBrowser.bundleID
+        fallbackBrowserAppURL = discoveredBrowser.appURL
     }
 
     func setFallbackBrowser(applicationURL: URL) throws {
