@@ -805,8 +805,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private let sourceIconView: NSImageView
     private let targetKindPopupButton: NSPopUpButton
     private let targetIconView: NSImageView
-    private let heliumProfileDirectoryField: NSTextField
+    private let profileSegmentedControl: NSSegmentedControl
+    private let profileDiscoveryErrorLabel: NSTextField
     private let profileContainerView: NSStackView
+
+    private var discoveredProfiles: [BrowserProfile] = []
+    private var currentProfileKey: String
 
     private let draft: PreferencesRuleDraft
     private let discoveredApplications: [DiscoveredApplication]
@@ -848,6 +852,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         self.onTest = onTest
 
         lastAppliedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentProfileKey = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
 
         sourceAppPopUpButton = NSPopUpButton()
         manualBundleIDField = NSTextField(string: draft.sourceBundleID)
@@ -856,7 +861,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         manualBundleIDLabel.textColor = .secondaryLabelColor
 
         targetKindPopupButton = NSPopUpButton()
-        heliumProfileDirectoryField = NSTextField(string: draft.heliumProfileDirectory)
+        profileSegmentedControl = NSSegmentedControl()
+
+        profileDiscoveryErrorLabel = NSTextField(labelWithString: "")
+        profileDiscoveryErrorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        profileDiscoveryErrorLabel.textColor = .systemOrange
+        profileDiscoveryErrorLabel.isHidden = true
 
         sourceIconView = Self.makeIconView(size: 32)
         targetIconView = Self.makeIconView(size: 32)
@@ -883,6 +893,9 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         applyManualFieldVisibilityForInitialState()
         updateSourceIcon(bundleID: draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines))
         updateTargetIcon(targetKind: draft.targetKind)
+        if draft.targetKind == .helium {
+            refreshProfileCards()
+        }
     }
 
     required init?(coder: NSCoder) {
@@ -994,16 +1007,22 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         targetPickerRow.alignment = .centerY
         targetPickerRow.spacing = 8
 
-        heliumProfileDirectoryField.placeholderString = "Profile directory name"
-        heliumProfileDirectoryField.delegate = self
-        heliumProfileDirectoryField.setAccessibilityIdentifier("preferences.rule.heliumProfileField")
+        let profileSectionLabel = NSTextField(labelWithString: "Profile")
+        profileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        profileSectionLabel.textColor = .secondaryLabelColor
 
-        let profileLabel = NSTextField(labelWithString: "Profile:")
-        profileContainerView.orientation = .horizontal
-        profileContainerView.alignment = .centerY
+        profileSegmentedControl.trackingMode = .selectOne
+        profileSegmentedControl.segmentStyle = .rounded
+        profileSegmentedControl.target = self
+        profileSegmentedControl.action = #selector(profileSegmentChanged(_:))
+        profileSegmentedControl.setAccessibilityIdentifier("preferences.rule.profileSegmentedControl")
+
+        profileContainerView.orientation = .vertical
+        profileContainerView.alignment = .leading
         profileContainerView.spacing = 6
-        profileContainerView.addArrangedSubview(profileLabel)
-        profileContainerView.addArrangedSubview(heliumProfileDirectoryField)
+        profileContainerView.addArrangedSubview(profileSectionLabel)
+        profileContainerView.addArrangedSubview(profileSegmentedControl)
+        profileContainerView.addArrangedSubview(profileDiscoveryErrorLabel)
         profileContainerView.isHidden = draft.targetKind != .helium
 
         let targetLabelRow = NSStackView(views: [NSTextField(labelWithString: "Routes To")])
@@ -1078,7 +1097,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             targetIconView.heightAnchor.constraint(equalToConstant: 32),
             sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 260),
             manualBundleIDField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
-            heliumProfileDirectoryField.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            profileSegmentedControl.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
             rootStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             rootStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             rootStack.topAnchor.constraint(equalTo: topAnchor, constant: 14),
@@ -1223,16 +1242,64 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             iconUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
                 self?.updateSourceIcon(bundleID: bundleID.trimmingCharacters(in: .whitespacesAndNewlines))
             }
-        } else if textField === heliumProfileDirectoryField {
-            onHeliumProfileDirectoryChange(textField.stringValue)
         }
     }
 
     @objc private func targetKindChanged(_ sender: Any?) {
         let targetKind: PreferencesRuleTargetKind = targetKindPopupButton.indexOfSelectedItem == 0 ? .fallbackBrowser : .helium
         profileContainerView.isHidden = targetKind != .helium
+        if targetKind == .helium {
+            currentProfileKey = ""
+            refreshProfileCards()
+        }
         updateTargetIcon(targetKind: targetKind)
         onTargetKindChange(targetKind)
+    }
+
+    @objc private func profileSegmentChanged(_ sender: NSSegmentedControl) {
+        guard discoveredProfiles.indices.contains(sender.selectedSegment) else { return }
+        let profile = discoveredProfiles[sender.selectedSegment]
+        currentProfileKey = profile.profileKey
+        onHeliumProfileDirectoryChange(profile.profileKey)
+        AppLogger.info("Profile rule row: selected profile \(profile.profileKey) (\(profile.displayName))", category: .app)
+    }
+
+    private func refreshProfileCards() {
+        let factory = BrowserProfileDiscoveryFactory()
+        guard let discoverer = factory.makeDiscoverer(forBundleID: BrowserLauncher.heliumBundleID) else {
+            AppLogger.error("No profile discoverer available for Helium (\(BrowserLauncher.heliumBundleID))", category: .app)
+            profileDiscoveryErrorLabel.stringValue = "Profile discovery is not available for this browser."
+            profileDiscoveryErrorLabel.isHidden = false
+            profileSegmentedControl.segmentCount = 0
+            return
+        }
+
+        do {
+            discoveredProfiles = try discoverer.discoverProfiles()
+        } catch {
+            AppLogger.error("Helium profile discovery failed: \(error)", category: .app)
+            profileDiscoveryErrorLabel.stringValue = "Could not read profiles: \(error.localizedDescription)"
+            profileDiscoveryErrorLabel.isHidden = false
+            profileSegmentedControl.segmentCount = 0
+            return
+        }
+
+        profileDiscoveryErrorLabel.isHidden = true
+        profileSegmentedControl.segmentCount = discoveredProfiles.count
+        for (i, profile) in discoveredProfiles.enumerated() {
+            profileSegmentedControl.setLabel(profile.displayName, forSegment: i)
+        }
+
+        if let selectedIndex = discoveredProfiles.firstIndex(where: { $0.profileKey == currentProfileKey }) {
+            profileSegmentedControl.selectedSegment = selectedIndex
+        } else {
+            profileSegmentedControl.selectedSegment = -1
+        }
+
+        AppLogger.info(
+            "Profile rule row: refreshed \(discoveredProfiles.count) profile card(s), selected key: '\(currentProfileKey)'",
+            category: .app
+        )
     }
 
     @objc private func removeRule(_ sender: Any?) {
