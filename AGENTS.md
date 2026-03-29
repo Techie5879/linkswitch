@@ -20,6 +20,7 @@ Single routing pipeline for incoming URLs. Sender detection is fragile; document
 
 TDD where practical: tests updated with code and must pass before done. Subagents OK for parallel work; primary agent integrates and **verifies** subagent changes.
 - After feature changes or bug fixes, always rebuild and reinstall the dev app before finishing the task.
+- When changing persisted config schema, add or update regression tests that load an existing on-disk config missing the new fields, or add an explicit migration with coverage before calling the change verified.
 - If the next step requires the user to do something in Xcode UI, stop and ask for that action explicitly, then wait for the user to confirm it is done before continuing implementation.
 
 ## Observability

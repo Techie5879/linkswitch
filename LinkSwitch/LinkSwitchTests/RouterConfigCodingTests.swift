@@ -50,4 +50,32 @@ final class RouterConfigCodingTests: XCTestCase {
 
         XCTAssertEqual(decoded, config)
     }
+
+    func testDecodeDefaultsMissingFallbackBrowserRouteToPlain() throws {
+        let expectedConfig = RouterConfig(
+            fallbackBrowserBundleID: "org.mozilla.firefox",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            fallbackBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default")
+                ),
+            ]
+        )
+
+        let legacyData = try makeLegacyConfigData(from: expectedConfig)
+        let decoded = try JSONDecoder().decode(RouterConfig.self, from: legacyData)
+
+        XCTAssertEqual(decoded, expectedConfig)
+    }
+
+    private func makeLegacyConfigData(from config: RouterConfig) throws -> Data {
+        let encodedConfig = try JSONEncoder().encode(config)
+        let jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
+        var legacyJSONObject = jsonObject
+        legacyJSONObject.removeValue(forKey: "fallbackBrowserRoute")
+        return try JSONSerialization.data(withJSONObject: legacyJSONObject, options: [.sortedKeys])
+    }
 }

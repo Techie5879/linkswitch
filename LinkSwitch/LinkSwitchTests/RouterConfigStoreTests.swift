@@ -57,6 +57,29 @@ final class RouterConfigStoreTests: XCTestCase {
         XCTAssertEqual(try store.load(), config)
     }
 
+    func testLoadDefaultsMissingFallbackBrowserRouteToPlainForExistingConfigFile() throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
+        let store = RouterConfigStore(configFileURL: configFileURL)
+        let expectedConfig = RouterConfig(
+            fallbackBrowserBundleID: "org.mozilla.firefox",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            fallbackBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    target: .fallbackBrowser
+                ),
+            ]
+        )
+
+        let legacyData = try makeLegacyConfigData(from: expectedConfig)
+        try legacyData.write(to: configFileURL)
+
+        XCTAssertEqual(try store.load(), expectedConfig)
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -65,5 +88,13 @@ final class RouterConfigStoreTests: XCTestCase {
             try? FileManager.default.removeItem(at: temporaryDirectory)
         }
         return temporaryDirectory
+    }
+
+    private func makeLegacyConfigData(from config: RouterConfig) throws -> Data {
+        let encodedConfig = try JSONEncoder().encode(config)
+        let jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
+        var legacyJSONObject = jsonObject
+        legacyJSONObject.removeValue(forKey: "fallbackBrowserRoute")
+        return try JSONSerialization.data(withJSONObject: legacyJSONObject, options: [.sortedKeys])
     }
 }

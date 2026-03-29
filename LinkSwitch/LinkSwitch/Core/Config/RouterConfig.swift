@@ -60,4 +60,40 @@ struct RouterConfig: Codable, Equatable {
     var fallbackBrowserAppURL: URL
     var fallbackBrowserRoute: FallbackBrowserRoute
     var rules: [SourceAppRule]
+
+    private enum CodingKeys: String, CodingKey {
+        case fallbackBrowserBundleID
+        case fallbackBrowserAppURL
+        case fallbackBrowserRoute
+        case rules
+    }
+
+    init(
+        fallbackBrowserBundleID: String,
+        fallbackBrowserAppURL: URL,
+        fallbackBrowserRoute: FallbackBrowserRoute,
+        rules: [SourceAppRule]
+    ) {
+        self.fallbackBrowserBundleID = fallbackBrowserBundleID
+        self.fallbackBrowserAppURL = fallbackBrowserAppURL
+        self.fallbackBrowserRoute = fallbackBrowserRoute
+        self.rules = rules
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fallbackBrowserBundleID = try container.decode(String.self, forKey: .fallbackBrowserBundleID)
+        fallbackBrowserAppURL = try container.decode(URL.self, forKey: .fallbackBrowserAppURL)
+        rules = try container.decode([SourceAppRule].self, forKey: .rules)
+
+        if let fallbackBrowserRoute = try container.decodeIfPresent(FallbackBrowserRoute.self, forKey: .fallbackBrowserRoute) {
+            self.fallbackBrowserRoute = fallbackBrowserRoute
+        } else {
+            AppLogger.info(
+                "Router config missing fallbackBrowserRoute; loading existing config with plain fallback route",
+                category: .config
+            )
+            fallbackBrowserRoute = .plain
+        }
+    }
 }

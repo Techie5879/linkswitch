@@ -82,6 +82,52 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadDefaultsMissingFallbackBrowserRouteToPlainForExistingConfigFile() throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
+        let expectedConfig = RouterConfig(
+            fallbackBrowserBundleID: "app.zen-browser.zen",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            fallbackBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    target: .helium(profileDirectory: "Profile 1")
+                ),
+            ]
+        )
+        let legacyData = try makeLegacyConfigData(from: expectedConfig)
+        try legacyData.write(to: configFileURL)
+
+        let model = PreferencesModel(
+            configStore: RouterConfigStore(configFileURL: configFileURL),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: configFileURL.path(percentEncoded: false),
+            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
+        )
+
+        try model.load()
+
+        XCTAssertEqual(model.fallbackBrowserBundleID, expectedConfig.fallbackBrowserBundleID)
+        XCTAssertEqual(model.fallbackBrowserAppURL, expectedConfig.fallbackBrowserAppURL)
+        XCTAssertEqual(model.fallbackBrowserRoute, .plain)
+        XCTAssertEqual(
+            model.ruleDrafts,
+            [
+                PreferencesRuleDraft(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    targetKind: .helium,
+                    fallbackBrowserRoute: .plain,
+                    heliumProfileDirectory: "Profile 1"
+                ),
+            ]
+        )
+    }
+
+    @MainActor
     func testSetFallbackBrowserReadsBundleIdentifierFromApplicationBundle() async throws {
         let applicationURL = try makeApplicationBundle(
             name: "Test Browser",
@@ -536,6 +582,24 @@ final class PreferencesModelTests: XCTestCase {
         }
 
         return applicationURL
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+        return temporaryDirectory
+    }
+
+    private func makeLegacyConfigData(from config: RouterConfig) throws -> Data {
+        let encodedConfig = try JSONEncoder().encode(config)
+        let jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
+        var legacyJSONObject = jsonObject
+        legacyJSONObject.removeValue(forKey: "fallbackBrowserRoute")
+        return try JSONSerialization.data(withJSONObject: legacyJSONObject, options: [.sortedKeys])
     }
 }
 

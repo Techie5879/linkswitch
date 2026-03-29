@@ -261,6 +261,7 @@ Current shape:
 
 - `RouterConfig` stores `fallbackBrowserRoute`; `RuleEngine` maps no-match / nil-sender to `config.fallbackBrowserRoute.browserTarget`.
 - Preferences include profile/container cards on the fallback browser card when the selected browser supports them; discovery is shared via `BrowserProfileRoutePicker` with source-app rule rows.
+- `RouterConfig` decoding treats a missing `fallbackBrowserRoute` key from an older saved config as `.plain`, so persisted configs from before this field existed still load and get rewritten in the new shape after the next save.
 
 ## Source references
 
