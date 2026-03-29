@@ -112,13 +112,15 @@ struct FirefoxProfileDiscovery: BrowserProfileDiscovering {
 /// that use the home directory instead of Application Support (e.g. LibreWolf).
 /// Used by BrowserProfileDiscoveryFactory.
 enum FirefoxBrowserAppSupportPath {
+    static let zenBrowserBundleID = "app.zen-browser.zen"
+
     /// Returns the Application Support relative path for the given bundle ID, or nil if unknown.
     /// Paths starting with "~/" are relative to the home directory, not Application Support.
     static func relativePath(forBundleID bundleID: String) -> String? {
         switch bundleID {
         case "org.mozilla.firefox":
             return "Firefox"
-        case "app.zen-browser.zen":
+        case zenBrowserBundleID:
             return "zen"
         case "net.waterfox.waterfox":
             return "Waterfox"
@@ -130,5 +132,36 @@ enum FirefoxBrowserAppSupportPath {
         default:
             return nil
         }
+    }
+
+    static func supportsFallbackProfileRouting(forBundleID bundleID: String) -> Bool {
+        guard bundleID != zenBrowserBundleID else {
+            return false
+        }
+        return relativePath(forBundleID: bundleID) != nil
+    }
+
+    static func absoluteProfileURL(
+        forBundleID bundleID: String,
+        profileKey: String,
+        appSupportURL: URL,
+        homeDirectoryURL: URL
+    ) -> URL? {
+        if profileKey.hasPrefix("/") {
+            return URL(fileURLWithPath: profileKey, isDirectory: true)
+        }
+
+        guard let relativePath = relativePath(forBundleID: bundleID) else {
+            return nil
+        }
+
+        let baseURL: URL
+        if relativePath.hasPrefix("~/") {
+            baseURL = homeDirectoryURL.appendingPathComponent(String(relativePath.dropFirst(2)), isDirectory: true)
+        } else {
+            baseURL = appSupportURL.appendingPathComponent(relativePath, isDirectory: true)
+        }
+
+        return baseURL.appendingPathComponent(profileKey, isDirectory: true)
     }
 }

@@ -12,6 +12,7 @@ final class RuleEngineTests: XCTestCase {
         let config = RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(),
@@ -32,6 +33,7 @@ final class RuleEngineTests: XCTestCase {
         let config = RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(),
@@ -49,7 +51,7 @@ final class RuleEngineTests: XCTestCase {
         XCTAssertEqual(ruleEngine.target(for: context, config: config), .helium(profileDirectory: "Profile 1"))
     }
 
-    func testNilSourceBundleIDReturnsFallbackBrowser() {
+    func testNilSourceBundleIDUsesConfiguredFallbackRoutePlain() {
         let context = IncomingOpenContext(
             url: URL(string: "https://example.com")!,
             sourceBundleID: nil
@@ -58,7 +60,7 @@ final class RuleEngineTests: XCTestCase {
         XCTAssertEqual(ruleEngine.target(for: context, config: makeConfig()), .fallbackBrowser)
     }
 
-    func testUnknownSourceBundleIDReturnsFallbackBrowser() {
+    func testUnknownSourceBundleIDUsesConfiguredFallbackRoutePlain() {
         let context = IncomingOpenContext(
             url: URL(string: "https://example.com")!,
             sourceBundleID: "com.apple.mail"
@@ -67,10 +69,47 @@ final class RuleEngineTests: XCTestCase {
         XCTAssertEqual(ruleEngine.target(for: context, config: makeConfig()), .fallbackBrowser)
     }
 
+    func testNilSourceBundleIDUsesConfiguredFallbackFirefoxProfile() {
+        let context = IncomingOpenContext(
+            url: URL(string: "https://example.com")!,
+            sourceBundleID: nil
+        )
+        let config = RouterConfig(
+            fallbackBrowserBundleID: "org.mozilla.firefox",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
+            rules: []
+        )
+
+        XCTAssertEqual(
+            ruleEngine.target(for: context, config: config),
+            .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default")
+        )
+    }
+
+    func testUnknownSourceUsesConfiguredFallbackZenContainer() {
+        let context = IncomingOpenContext(
+            url: URL(string: "https://example.com")!,
+            sourceBundleID: "com.apple.mail"
+        )
+        let config = RouterConfig(
+            fallbackBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            fallbackBrowserRoute: .zenContainer(containerName: "Work"),
+            rules: []
+        )
+
+        XCTAssertEqual(
+            ruleEngine.target(for: context, config: config),
+            .fallbackBrowserZenContainer(containerName: "Work")
+        )
+    }
+
     private func makeConfig() -> RouterConfig {
         RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(),

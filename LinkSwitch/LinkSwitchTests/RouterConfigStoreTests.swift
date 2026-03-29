@@ -18,6 +18,7 @@ final class RouterConfigStoreTests: XCTestCase {
         let config = RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
@@ -41,6 +42,7 @@ final class RouterConfigStoreTests: XCTestCase {
         let config = RouterConfig(
             fallbackBrowserBundleID: "app.zen-browser.zen",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            fallbackBrowserRoute: .zenContainer(containerName: "Work"),
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,

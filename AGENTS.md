@@ -2,7 +2,7 @@
 
 ## Scope
 
-Native macOS app that registers as the `http` / `https` URL handler, routes opens by **source app bundle ID** (first-class case: Slack to Helium with a Chromium-style work profile), and sends everything else to a **user-chosen fallback browser** stored in config. Minimal preferences UI for fallback browser and per-source rules; config persisted explicitly (do not infer fallback from Launch Services once this app is the handler). No domain/URL pattern routing, no chooser UI, no Firefox/Zen/Safari profile support, no extensions, no interception outside the normal URL-handler path.
+Native macOS app that registers as the `http` / `https` URL handler, routes opens by **source app bundle ID** (first-class case: Slack to Helium with a Chromium-style work profile), and sends everything else to a **user-chosen fallback browser** stored in config. Minimal preferences UI for fallback browser and per-source rules; config persisted explicitly (do not infer fallback from Launch Services once this app is the handler). Firefox-family fallback browsers may target real `profiles.ini` profiles, and Zen fallback routing may target container identities through the explicit extension-based `ext+container:` flow. No domain/URL pattern routing, no chooser UI, no Safari profile support, no generic extension platform support beyond that explicit Zen container handoff, and no interception outside the normal URL-handler path.
 
 ## Stack
 

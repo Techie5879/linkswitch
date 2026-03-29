@@ -59,6 +59,97 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
+    func testOpenFallbackFirefoxProfileLaunchesExecutableWithAbsoluteProfilePath() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let appSupportURL = try makeFirefoxAppSupport(relativePath: "Firefox", profileKey: "Profiles/work.default")
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher,
+            appSupportURL: appSupportURL,
+            homeDirectoryURL: appSupportURL.deletingLastPathComponent()
+        )
+        let url = URL(string: "https://example.com/firefox")!
+        let config = RouterConfig(
+            fallbackBrowserBundleID: "org.mozilla.firefox",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            fallbackBrowserRoute: .plain,
+            rules: []
+        )
+
+        try await launcher.open(url, target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"), config: config)
+
+        XCTAssertEqual(
+            workspaceLauncher.launchApplicationExecutableCalls,
+            [
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
+                    applicationURL: config.fallbackBrowserAppURL,
+                    arguments: [
+                        "-new-instance",
+                        "-profile",
+                        appSupportURL.appendingPathComponent("Firefox/Profiles/work.default").path(percentEncoded: false),
+                        "https://example.com/firefox",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
+    }
+
+    func testOpenFallbackZenContainerUsesExtContainerURL() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let url = URL(string: "https://example.com/zen?tab=1")!
+        let config = RouterConfig(
+            fallbackBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            fallbackBrowserRoute: .plain,
+            rules: []
+        )
+
+        try await launcher.open(url, target: .fallbackBrowserZenContainer(containerName: "Work"), config: config)
+
+        XCTAssertEqual(
+            workspaceLauncher.openURLCalls,
+            [
+                WorkspaceLaunchSpy.OpenURLCall(
+                    urls: [try XCTUnwrap(URL(string: "ext+container:name=Work&url=https%3A%2F%2Fexample.com%2Fzen%3Ftab%3D1"))],
+                    applicationURL: config.fallbackBrowserAppURL
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
+    }
+
+    func testOpenFallbackFirefoxProfileThrowsForUnsupportedFallbackBrowserBundleID() async {
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: WorkspaceLaunchSpy()
+        )
+        let config = RouterConfig(
+            fallbackBrowserBundleID: "com.apple.Safari",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
+            rules: []
+        )
+
+        do {
+            try await launcher.open(
+                URL(string: "https://example.com/firefox")!,
+                target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
+                config: config
+            )
+            XCTFail("Expected open to throw")
+        } catch {
+            XCTAssertEqual(
+                error as? BrowserLauncherError,
+                .unsupportedFallbackBrowserProfile(bundleID: "com.apple.Safari")
+            )
+        }
+    }
+
     func testOpenHeliumPropagatesResolutionErrors() async {
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(applicationURLResult: nil),
@@ -92,8 +183,23 @@ final class BrowserLauncherTests: XCTestCase {
         RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: []
         )
+    }
+
+    private func makeFirefoxAppSupport(relativePath: String, profileKey: String) throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let appSupportURL = root.appendingPathComponent("Application Support", isDirectory: true)
+        let profileURL = appSupportURL
+            .appendingPathComponent(relativePath, isDirectory: true)
+            .appendingPathComponent(profileKey, isDirectory: true)
+        try FileManager.default.createDirectory(at: profileURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: root)
+        }
+        return appSupportURL
     }
 }
 

@@ -82,6 +82,7 @@ final class URLIntakeControllerTests: XCTestCase {
         RouterConfig(
             fallbackBrowserBundleID: "com.apple.Safari",
             fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,

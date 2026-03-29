@@ -22,6 +22,67 @@ private final class CardView: NSView {
     }
 }
 
+// MARK: - ProfileCardButton
+
+/// A lightweight selectable card used for browser profile choices.
+private final class ProfileCardButton: NSButton {
+    var isSelectedCard = false {
+        didSet {
+            updateAppearance()
+        }
+    }
+
+    init(title: String) {
+        super.init(frame: .zero)
+        self.title = title
+        setButtonType(.momentaryPushIn)
+        isBordered = false
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        lineBreakMode = .byTruncatingTail
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+        updateAppearance()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        let base = super.intrinsicContentSize
+        return NSSize(width: base.width + 24, height: max(36, base.height + 14))
+    }
+
+    override func updateLayer() {
+        super.updateLayer()
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        let textColor: NSColor
+        if isSelectedCard {
+            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+            layer?.borderColor = NSColor.controlAccentColor.cgColor
+            layer?.borderWidth = 1
+            textColor = .labelColor
+        } else {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.borderColor = NSColor.separatorColor.cgColor
+            layer?.borderWidth = 1
+            textColor = .secondaryLabelColor
+        }
+        layer?.cornerRadius = 10
+        attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: isSelectedCard ? .semibold : .medium),
+                .foregroundColor: textColor,
+            ]
+        )
+    }
+}
+
 // MARK: - FlippedView
 
 /// An NSView subclass with a flipped coordinate system so the scroll view's
@@ -63,6 +124,12 @@ final class PreferencesViewController: NSViewController {
     private let fallbackBrowserNameLabel = NSTextField(labelWithString: "")
     private let fallbackBrowserBundleLabel = NSTextField(labelWithString: "")
     private let fallbackBrowserPopup = NSPopUpButton()
+
+    private let fallbackProfileSectionLabel = NSTextField(labelWithString: "Profile")
+    private let fallbackProfileCardsStack = NSStackView()
+    private let fallbackProfileDiscoveryErrorLabel = NSTextField(labelWithString: "")
+    private let fallbackProfileContainerView = NSStackView()
+    private var fallbackBrowserDisplayedProfiles: [BrowserProfile] = []
 
     // MARK: Handler status card controls
     private let handlerStatusImageView: NSImageView = {
@@ -267,7 +334,27 @@ final class PreferencesViewController: NSViewController {
         actionsRow.orientation = .horizontal
         actionsRow.spacing = 8
 
-        let contentStack = NSStackView(views: [titleLabel, browserInfoRow, actionsRow])
+        fallbackProfileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        fallbackProfileSectionLabel.textColor = .secondaryLabelColor
+
+        fallbackProfileCardsStack.orientation = .horizontal
+        fallbackProfileCardsStack.alignment = .centerY
+        fallbackProfileCardsStack.spacing = 8
+        fallbackProfileCardsStack.setAccessibilityIdentifier("preferences.fallbackBrowser.profileCardsStack")
+
+        fallbackProfileDiscoveryErrorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        fallbackProfileDiscoveryErrorLabel.textColor = .systemOrange
+        fallbackProfileDiscoveryErrorLabel.isHidden = true
+
+        fallbackProfileContainerView.orientation = .vertical
+        fallbackProfileContainerView.alignment = .leading
+        fallbackProfileContainerView.spacing = 6
+        fallbackProfileContainerView.addArrangedSubview(fallbackProfileSectionLabel)
+        fallbackProfileContainerView.addArrangedSubview(fallbackProfileCardsStack)
+        fallbackProfileContainerView.addArrangedSubview(fallbackProfileDiscoveryErrorLabel)
+        fallbackProfileContainerView.isHidden = true
+
+        let contentStack = NSStackView(views: [titleLabel, browserInfoRow, actionsRow, fallbackProfileContainerView])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
@@ -282,6 +369,7 @@ final class PreferencesViewController: NSViewController {
             contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
             contentStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
             fallbackBrowserPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            fallbackProfileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
         ])
 
         return card
@@ -419,6 +507,7 @@ final class PreferencesViewController: NSViewController {
 
         refreshFallbackBrowserDisplay()
         refreshFallbackBrowserPopup()
+        refreshFallbackProfileBrowserSection()
         refreshHandlerStatusDisplay()
 
         refreshRules()
@@ -534,6 +623,95 @@ final class PreferencesViewController: NSViewController {
         }
     }
 
+    private func refreshFallbackProfileBrowserSection() {
+        let bundleID = model.fallbackBrowserBundleID
+        let mode = BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: bundleID)
+        fallbackProfileSectionLabel.stringValue = mode.sectionTitle
+
+        guard model.fallbackBrowserAppURL != nil, !bundleID.isEmpty, mode != .none else {
+            fallbackProfileContainerView.isHidden = true
+            fallbackBrowserDisplayedProfiles = []
+            clearFallbackProfileCards()
+            return
+        }
+
+        fallbackProfileContainerView.isHidden = false
+        let result = BrowserProfileRoutePicker.loadProfileCards(mode: mode, fallbackBrowserBundleID: bundleID)
+        fallbackBrowserDisplayedProfiles = result.displayedProfiles
+        if let errorMessage = result.errorMessage {
+            fallbackProfileDiscoveryErrorLabel.stringValue = errorMessage
+            fallbackProfileDiscoveryErrorLabel.isHidden = false
+        } else {
+            fallbackProfileDiscoveryErrorLabel.isHidden = true
+        }
+
+        rebuildFallbackProfileCards()
+        AppLogger.info(
+            "Default fallback browser profile section (\(result.logContext)): \(fallbackBrowserDisplayedProfiles.count) card(s), selected key '\(currentFallbackRouteSelectionKey())'",
+            category: .app
+        )
+    }
+
+    private func currentFallbackRouteSelectionKey() -> String {
+        switch model.fallbackBrowserRoute {
+        case .plain:
+            return ""
+        case let .firefoxProfile(profileKey):
+            return profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .zenContainer(containerName):
+            return containerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private func rebuildFallbackProfileCards() {
+        clearFallbackProfileCards()
+        for (index, profile) in fallbackBrowserDisplayedProfiles.enumerated() {
+            let button = ProfileCardButton(title: profile.displayName)
+            button.tag = index
+            button.target = self
+            button.action = #selector(fallbackProfileCardSelected(_:))
+            button.setAccessibilityIdentifier("preferences.fallbackBrowser.profileCard.\(index)")
+            fallbackProfileCardsStack.addArrangedSubview(button)
+        }
+        applyFallbackProfileCardSelection()
+    }
+
+    private func clearFallbackProfileCards() {
+        fallbackProfileCardsStack.arrangedSubviews.forEach { view in
+            fallbackProfileCardsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+    }
+
+    private func applyFallbackProfileCardSelection() {
+        let key = currentFallbackRouteSelectionKey()
+        for (index, view) in fallbackProfileCardsStack.arrangedSubviews.enumerated() {
+            guard let button = view as? ProfileCardButton, fallbackBrowserDisplayedProfiles.indices.contains(index) else { continue }
+            button.isSelectedCard = fallbackBrowserDisplayedProfiles[index].profileKey == key
+        }
+    }
+
+    @objc private func fallbackProfileCardSelected(_ sender: NSButton) {
+        guard fallbackBrowserDisplayedProfiles.indices.contains(sender.tag) else { return }
+        let profile = fallbackBrowserDisplayedProfiles[sender.tag]
+        let mode = BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: model.fallbackBrowserBundleID)
+        let route: FallbackBrowserRoute
+        switch mode {
+        case .fallbackFirefoxProfile:
+            route = profile.profileKey.isEmpty ? .plain : .firefoxProfile(profileKey: profile.profileKey)
+        case .fallbackZenContainer:
+            route = profile.profileKey.isEmpty ? .plain : .zenContainer(containerName: profile.profileKey)
+        case .none, .heliumProfile:
+            return
+        }
+        model.updateFallbackBrowserRoute(route)
+        applyFallbackProfileCardSelection()
+        AppLogger.info(
+            "Default fallback browser: selected card \(profile.displayName) key '\(profile.profileKey)' route \(route.description)",
+            category: .app
+        )
+    }
+
     private func refreshRules() {
         rulesStackView.arrangedSubviews.forEach { view in
             rulesStackView.removeArrangedSubview(view)
@@ -553,6 +731,7 @@ final class PreferencesViewController: NSViewController {
                 draft: draft,
                 discoveredApplications: model.discoveredApplications,
                 iconProvider: iconProvider,
+                fallbackBrowserBundleID: model.fallbackBrowserBundleID,
                 fallbackBrowserAppURL: model.fallbackBrowserAppURL,
                 onSourceBundleIDChange: { [weak self] value in
                     self?.model.updateRuleSourceBundleID(id: draft.id, value: value)
@@ -563,6 +742,9 @@ final class PreferencesViewController: NSViewController {
                 onTargetKindChange: { [weak self] targetKind in
                     self?.model.updateRuleTargetKind(id: draft.id, targetKind: targetKind)
                     self?.refreshUI()
+                },
+                onFallbackBrowserRouteChange: { [weak self] route in
+                    self?.model.updateRuleFallbackBrowserRoute(id: draft.id, route: route)
                 },
                 onHeliumProfileDirectoryChange: { [weak self] value in
                     self?.model.updateRuleHeliumProfileDirectory(id: draft.id, value: value)
@@ -596,8 +778,7 @@ final class PreferencesViewController: NSViewController {
             let browser = model.discoveredBrowsers[tag]
             AppLogger.info("Fallback browser changed to \(browser.bundleID) via popup", category: .app)
             model.setFallbackBrowser(discoveredBrowser: browser)
-            refreshFallbackBrowserDisplay()
-            refreshHandlerStatusDisplay()
+            refreshUI()
         }
     }
 
@@ -805,21 +986,24 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private let sourceIconView: NSImageView
     private let targetKindPopupButton: NSPopUpButton
     private let targetIconView: NSImageView
-    private let profileSegmentedControl: NSSegmentedControl
+    private let profileCardsStack: NSStackView
+    private let profileSectionLabel: NSTextField
     private let profileDiscoveryErrorLabel: NSTextField
     private let profileContainerView: NSStackView
 
     private var discoveredProfiles: [BrowserProfile] = []
-    private var currentProfileKey: String
+    private var currentSelectionKey: String
 
     private let draft: PreferencesRuleDraft
     private let discoveredApplications: [DiscoveredApplication]
     private let iconProvider: AppIconProvider
+    private let fallbackBrowserBundleID: String
     private var fallbackBrowserAppURL: URL?
 
     private let onSourceBundleIDChange: (String) -> Void
     private let onSourcePickerNeedsUIRefresh: () -> Void
     private let onTargetKindChange: (PreferencesRuleTargetKind) -> Void
+    private let onFallbackBrowserRouteChange: (FallbackBrowserRoute) -> Void
     private let onHeliumProfileDirectoryChange: (String) -> Void
     private let onRemove: () -> Void
     private let onTest: () -> Void
@@ -832,10 +1016,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         draft: PreferencesRuleDraft,
         discoveredApplications: [DiscoveredApplication],
         iconProvider: AppIconProvider,
+        fallbackBrowserBundleID: String,
         fallbackBrowserAppURL: URL?,
         onSourceBundleIDChange: @escaping (String) -> Void,
         onSourcePickerNeedsUIRefresh: @escaping () -> Void,
         onTargetKindChange: @escaping (PreferencesRuleTargetKind) -> Void,
+        onFallbackBrowserRouteChange: @escaping (FallbackBrowserRoute) -> Void,
         onHeliumProfileDirectoryChange: @escaping (String) -> Void,
         onRemove: @escaping () -> Void,
         onTest: @escaping () -> Void
@@ -843,16 +1029,30 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         self.draft = draft
         self.discoveredApplications = discoveredApplications
         self.iconProvider = iconProvider
+        self.fallbackBrowserBundleID = fallbackBrowserBundleID
         self.fallbackBrowserAppURL = fallbackBrowserAppURL
         self.onSourceBundleIDChange = onSourceBundleIDChange
         self.onSourcePickerNeedsUIRefresh = onSourcePickerNeedsUIRefresh
         self.onTargetKindChange = onTargetKindChange
+        self.onFallbackBrowserRouteChange = onFallbackBrowserRouteChange
         self.onHeliumProfileDirectoryChange = onHeliumProfileDirectoryChange
         self.onRemove = onRemove
         self.onTest = onTest
 
         lastAppliedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentProfileKey = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch draft.targetKind {
+        case .fallbackBrowser:
+            switch draft.fallbackBrowserRoute {
+            case .plain:
+                currentSelectionKey = ""
+            case let .firefoxProfile(profileKey):
+                currentSelectionKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            case let .zenContainer(containerName):
+                currentSelectionKey = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        case .helium:
+            currentSelectionKey = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
 
         sourceAppPopUpButton = NSPopUpButton()
         manualBundleIDField = NSTextField(string: draft.sourceBundleID)
@@ -861,7 +1061,10 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         manualBundleIDLabel.textColor = .secondaryLabelColor
 
         targetKindPopupButton = NSPopUpButton()
-        profileSegmentedControl = NSSegmentedControl()
+        profileCardsStack = NSStackView()
+        profileSectionLabel = NSTextField(labelWithString: "Profile")
+        profileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        profileSectionLabel.textColor = .secondaryLabelColor
 
         profileDiscoveryErrorLabel = NSTextField(labelWithString: "")
         profileDiscoveryErrorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -893,7 +1096,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         applyManualFieldVisibilityForInitialState()
         updateSourceIcon(bundleID: draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines))
         updateTargetIcon(targetKind: draft.targetKind)
-        if draft.targetKind == .helium {
+        refreshProfilePresentation()
+        if profileRouteSelectionMode() != .none {
             refreshProfileCards()
         }
     }
@@ -1007,23 +1211,18 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         targetPickerRow.alignment = .centerY
         targetPickerRow.spacing = 8
 
-        let profileSectionLabel = NSTextField(labelWithString: "Profile")
-        profileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-        profileSectionLabel.textColor = .secondaryLabelColor
-
-        profileSegmentedControl.trackingMode = .selectOne
-        profileSegmentedControl.segmentStyle = .rounded
-        profileSegmentedControl.target = self
-        profileSegmentedControl.action = #selector(profileSegmentChanged(_:))
-        profileSegmentedControl.setAccessibilityIdentifier("preferences.rule.profileSegmentedControl")
+        profileCardsStack.orientation = .horizontal
+        profileCardsStack.alignment = .centerY
+        profileCardsStack.spacing = 8
+        profileCardsStack.setAccessibilityIdentifier("preferences.rule.profileCardsStack")
 
         profileContainerView.orientation = .vertical
         profileContainerView.alignment = .leading
         profileContainerView.spacing = 6
         profileContainerView.addArrangedSubview(profileSectionLabel)
-        profileContainerView.addArrangedSubview(profileSegmentedControl)
+        profileContainerView.addArrangedSubview(profileCardsStack)
         profileContainerView.addArrangedSubview(profileDiscoveryErrorLabel)
-        profileContainerView.isHidden = draft.targetKind != .helium
+        profileContainerView.isHidden = true
 
         let targetLabelRow = NSStackView(views: [NSTextField(labelWithString: "Routes To")])
         (targetLabelRow.arrangedSubviews[0] as? NSTextField)?.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
@@ -1095,9 +1294,13 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             sourceIconView.heightAnchor.constraint(equalToConstant: 32),
             targetIconView.widthAnchor.constraint(equalToConstant: 32),
             targetIconView.heightAnchor.constraint(equalToConstant: 32),
+            sourceLabelRow.widthAnchor.constraint(equalTo: sourcePickerRow.widthAnchor),
+            targetLabelRow.widthAnchor.constraint(equalTo: targetPickerRow.widthAnchor),
             sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 260),
+            targetKindPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             manualBundleIDField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
-            profileSegmentedControl.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            profileCardsStack.widthAnchor.constraint(greaterThanOrEqualTo: targetPickerRow.widthAnchor),
+            profileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
             rootStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             rootStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             rootStack.topAnchor.constraint(equalTo: topAnchor, constant: 14),
@@ -1156,6 +1359,28 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             let menuIcon = icon.copy() as! NSImage
             menuIcon.size = NSSize(width: 16, height: 16)
             item.image = menuIcon
+        }
+    }
+
+    private func selectedTargetKind() -> PreferencesRuleTargetKind {
+        targetKindPopupButton.indexOfSelectedItem == 0 ? .fallbackBrowser : .helium
+    }
+
+    private func profileRouteSelectionMode() -> BrowserProfileRouteSelectionMode {
+        BrowserProfileRouteSelectionMode.mode(
+            targetKind: selectedTargetKind(),
+            fallbackBrowserBundleID: fallbackBrowserBundleID
+        )
+    }
+
+    private func refreshProfilePresentation() {
+        let mode = profileRouteSelectionMode()
+        profileSectionLabel.stringValue = mode.sectionTitle
+        profileContainerView.isHidden = mode == .none
+        if mode == .none {
+            discoveredProfiles = []
+            profileDiscoveryErrorLabel.isHidden = true
+            clearProfileCards()
         }
     }
 
@@ -1246,60 +1471,91 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     }
 
     @objc private func targetKindChanged(_ sender: Any?) {
-        let targetKind: PreferencesRuleTargetKind = targetKindPopupButton.indexOfSelectedItem == 0 ? .fallbackBrowser : .helium
-        profileContainerView.isHidden = targetKind != .helium
-        if targetKind == .helium {
-            currentProfileKey = ""
+        let targetKind = selectedTargetKind()
+        currentSelectionKey = ""
+        refreshProfilePresentation()
+        if profileRouteSelectionMode() != .none {
             refreshProfileCards()
         }
         updateTargetIcon(targetKind: targetKind)
         onTargetKindChange(targetKind)
     }
 
-    @objc private func profileSegmentChanged(_ sender: NSSegmentedControl) {
-        guard discoveredProfiles.indices.contains(sender.selectedSegment) else { return }
-        let profile = discoveredProfiles[sender.selectedSegment]
-        currentProfileKey = profile.profileKey
-        onHeliumProfileDirectoryChange(profile.profileKey)
-        AppLogger.info("Profile rule row: selected profile \(profile.profileKey) (\(profile.displayName))", category: .app)
+    @objc private func profileCardSelected(_ sender: NSButton) {
+        guard discoveredProfiles.indices.contains(sender.tag) else { return }
+        let profile = discoveredProfiles[sender.tag]
+        currentSelectionKey = profile.profileKey
+        switch profileRouteSelectionMode() {
+        case .heliumProfile:
+            onHeliumProfileDirectoryChange(profile.profileKey)
+        case .fallbackFirefoxProfile:
+            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+                ? .plain
+                : .firefoxProfile(profileKey: profile.profileKey)
+            onFallbackBrowserRouteChange(route)
+        case .fallbackZenContainer:
+            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+                ? .plain
+                : .zenContainer(containerName: profile.profileKey)
+            onFallbackBrowserRouteChange(route)
+        case .none:
+            return
+        }
+        applyProfileCardSelection()
+        AppLogger.info("Profile rule row: selected option \(profile.profileKey) (\(profile.displayName))", category: .app)
     }
 
     private func refreshProfileCards() {
-        let factory = BrowserProfileDiscoveryFactory()
-        guard let discoverer = factory.makeDiscoverer(forBundleID: BrowserLauncher.heliumBundleID) else {
-            AppLogger.error("No profile discoverer available for Helium (\(BrowserLauncher.heliumBundleID))", category: .app)
-            profileDiscoveryErrorLabel.stringValue = "Profile discovery is not available for this browser."
-            profileDiscoveryErrorLabel.isHidden = false
-            profileSegmentedControl.segmentCount = 0
+        let mode = profileRouteSelectionMode()
+        refreshProfilePresentation()
+        guard mode != .none else {
             return
         }
 
-        do {
-            discoveredProfiles = try discoverer.discoverProfiles()
-        } catch {
-            AppLogger.error("Helium profile discovery failed: \(error)", category: .app)
-            profileDiscoveryErrorLabel.stringValue = "Could not read profiles: \(error.localizedDescription)"
+        let result = BrowserProfileRoutePicker.loadProfileCards(
+            mode: mode,
+            fallbackBrowserBundleID: fallbackBrowserBundleID
+        )
+        discoveredProfiles = result.displayedProfiles
+        if let errorMessage = result.errorMessage {
+            profileDiscoveryErrorLabel.stringValue = errorMessage
             profileDiscoveryErrorLabel.isHidden = false
-            profileSegmentedControl.segmentCount = 0
-            return
-        }
-
-        profileDiscoveryErrorLabel.isHidden = true
-        profileSegmentedControl.segmentCount = discoveredProfiles.count
-        for (i, profile) in discoveredProfiles.enumerated() {
-            profileSegmentedControl.setLabel(profile.displayName, forSegment: i)
-        }
-
-        if let selectedIndex = discoveredProfiles.firstIndex(where: { $0.profileKey == currentProfileKey }) {
-            profileSegmentedControl.selectedSegment = selectedIndex
         } else {
-            profileSegmentedControl.selectedSegment = -1
+            profileDiscoveryErrorLabel.isHidden = true
         }
 
+        rebuildProfileCards()
         AppLogger.info(
-            "Profile rule row: refreshed \(discoveredProfiles.count) profile card(s), selected key: '\(currentProfileKey)'",
+            "Profile rule row (\(result.logContext)): refreshed \(discoveredProfiles.count) card(s), selected key: '\(currentSelectionKey)'",
             category: .app
         )
+    }
+
+    private func rebuildProfileCards() {
+        clearProfileCards()
+        for (index, profile) in discoveredProfiles.enumerated() {
+            let button = ProfileCardButton(title: profile.displayName)
+            button.tag = index
+            button.target = self
+            button.action = #selector(profileCardSelected(_:))
+            button.setAccessibilityIdentifier("preferences.rule.profileCard.\(index)")
+            profileCardsStack.addArrangedSubview(button)
+        }
+        applyProfileCardSelection()
+    }
+
+    private func clearProfileCards() {
+        profileCardsStack.arrangedSubviews.forEach { view in
+            profileCardsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+    }
+
+    private func applyProfileCardSelection() {
+        for (index, view) in profileCardsStack.arrangedSubviews.enumerated() {
+            guard let button = view as? ProfileCardButton, discoveredProfiles.indices.contains(index) else { continue }
+            button.isSelectedCard = discoveredProfiles[index].profileKey == currentSelectionKey
+        }
     }
 
     @objc private func removeRule(_ sender: Any?) {

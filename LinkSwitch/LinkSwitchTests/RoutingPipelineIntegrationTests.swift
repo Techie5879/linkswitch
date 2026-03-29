@@ -42,6 +42,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                     config: RouterConfig(
                         fallbackBrowserBundleID: "com.apple.Safari",
                         fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        fallbackBrowserRoute: .plain,
                         rules: [
                             SourceAppRule(
                                 id: ruleID,
@@ -91,6 +92,52 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                     config: RouterConfig(
                         fallbackBrowserBundleID: "com.apple.Safari",
                         fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        fallbackBrowserRoute: .plain,
+                        rules: []
+                    )
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredFallbackFirefoxProfile() async throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
+        let configStore = RouterConfigStore(configFileURL: configFileURL)
+        let preferencesModel = PreferencesModel(
+            configStore: configStore,
+            browserLauncher: RoutingPipelineBrowserLauncherSpy(),
+            configFileURLDescription: configFileURL.path()
+        )
+
+        preferencesModel.fallbackBrowserBundleID = "org.mozilla.firefox"
+        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Firefox.app")
+        preferencesModel.updateFallbackBrowserRoute(.firefoxProfile(profileKey: "Profiles/work.default"))
+        try preferencesModel.save()
+
+        let browserLauncher = RoutingPipelineBrowserLauncherSpy()
+        let intakeController = URLIntakeController(
+            configStore: RouterConfigStore(configFileURL: configFileURL),
+            ruleEngine: RuleEngine(),
+            browserLauncher: browserLauncher
+        )
+
+        try await intakeController.handle(
+            urls: [URL(string: "https://example.com/fallback")!],
+            sourceBundleID: "com.apple.mail"
+        )
+
+        XCTAssertEqual(
+            browserLauncher.openCalls,
+            [
+                RoutingPipelineBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/fallback")!,
+                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
+                    config: RouterConfig(
+                        fallbackBrowserBundleID: "org.mozilla.firefox",
+                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+                        fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
                         rules: []
                     )
                 ),

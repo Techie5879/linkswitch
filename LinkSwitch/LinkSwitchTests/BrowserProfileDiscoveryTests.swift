@@ -190,3 +190,126 @@ final class FirefoxProfileDiscoveryTests: XCTestCase {
         return (dir, url)
     }
 }
+
+final class ZenContainerDiscoveryTests: XCTestCase {
+    func testDiscoverProfilesReturnsPublicContainersFromInstalledDefaultProfile() throws {
+        let appSupportURL = try makeZenAppSupport(
+            profilesIni: """
+            [Profile0]
+            Name=Default (release)
+            IsRelative=1
+            Path=Profiles/5wng7prr.Default (release)
+
+            [Profile1]
+            Name=Other
+            IsRelative=1
+            Path=Profiles/other.default
+            Default=1
+            """,
+            installsIni: """
+            [Install6ED35B3CA1B5D3AF]
+            Default=Profiles/5wng7prr.Default (release)
+            Locked=1
+            """,
+            containersByProfilePath: [
+                "Profiles/5wng7prr.Default (release)": """
+                {
+                  "version": 5,
+                  "identities": [
+                    { "public": true, "l10nId": "user-context-personal", "userContextId": 1 },
+                    { "public": true, "name": "Work", "userContextId": 2 },
+                    { "public": false, "name": "Internal", "userContextId": 999 }
+                  ]
+                }
+                """,
+                "Profiles/other.default": """
+                {
+                  "version": 5,
+                  "identities": [
+                    { "public": true, "name": "Shopping", "userContextId": 4 }
+                  ]
+                }
+                """,
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: appSupportURL.deletingLastPathComponent()) }
+
+        let containers = try ZenContainerDiscovery(appSupportURL: appSupportURL).discoverProfiles()
+
+        XCTAssertEqual(containers, [
+            BrowserProfile(profileKey: "Personal", displayName: "Personal"),
+            BrowserProfile(profileKey: "Work", displayName: "Work"),
+        ])
+    }
+
+    func testDiscoverProfilesFallsBackToProfilesIniDefaultWhenInstallsIniMissing() throws {
+        let appSupportURL = try makeZenAppSupport(
+            profilesIni: """
+            [Profile0]
+            Name=Default Profile
+            IsRelative=1
+            Path=Profiles/default.profile
+            Default=1
+            """,
+            installsIni: nil,
+            containersByProfilePath: [
+                "Profiles/default.profile": """
+                {
+                  "version": 5,
+                  "identities": [
+                    { "public": true, "l10nId": "user-context-work", "userContextId": 2 }
+                  ]
+                }
+                """,
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: appSupportURL.deletingLastPathComponent()) }
+
+        let containers = try ZenContainerDiscovery(appSupportURL: appSupportURL).discoverProfiles()
+
+        XCTAssertEqual(containers, [
+            BrowserProfile(profileKey: "Work", displayName: "Work"),
+        ])
+    }
+
+    func testDiscoverProfilesThrowsWhenProfilesIniIsMissing() throws {
+        let appSupportURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: appSupportURL) }
+
+        XCTAssertThrowsError(
+            try ZenContainerDiscovery(appSupportURL: appSupportURL).discoverProfiles()
+        ) { error in
+            XCTAssertEqual(
+                error as? ZenContainerDiscoveryError,
+                .profilesIniNotFound(appSupportURL.appendingPathComponent("zen").appendingPathComponent("profiles.ini"))
+            )
+        }
+    }
+
+    private func makeZenAppSupport(
+        profilesIni: String,
+        installsIni: String?,
+        containersByProfilePath: [String: String]
+    ) throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let appSupportURL = root.appendingPathComponent("Application Support", isDirectory: true)
+        let zenRootURL = appSupportURL.appendingPathComponent("zen", isDirectory: true)
+        try FileManager.default.createDirectory(at: zenRootURL, withIntermediateDirectories: true)
+
+        try profilesIni.data(using: .utf8)!.write(to: zenRootURL.appendingPathComponent("profiles.ini"))
+        if let installsIni {
+            try installsIni.data(using: .utf8)!.write(to: zenRootURL.appendingPathComponent("installs.ini"))
+        }
+
+        for (profilePath, containersJSON) in containersByProfilePath {
+            let profileURL = zenRootURL.appendingPathComponent(profilePath, isDirectory: true)
+            try FileManager.default.createDirectory(at: profileURL, withIntermediateDirectories: true)
+            try containersJSON.data(using: .utf8)!.write(to: profileURL.appendingPathComponent("containers.json"))
+        }
+
+        return appSupportURL
+    }
+}

@@ -5,8 +5,9 @@ final class PreferencesModelTests: XCTestCase {
     @MainActor
     func testLoadPopulatesDraftFromStoredConfig() async throws {
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            fallbackBrowserRoute: .zenContainer(containerName: "Work"),
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
@@ -25,8 +26,9 @@ final class PreferencesModelTests: XCTestCase {
 
         try model.load()
 
-        XCTAssertEqual(model.fallbackBrowserBundleID, "com.apple.Safari")
-        XCTAssertEqual(model.fallbackBrowserAppURL, URL(fileURLWithPath: "/Applications/Safari.app"))
+        XCTAssertEqual(model.fallbackBrowserBundleID, FirefoxBrowserAppSupportPath.zenBrowserBundleID)
+        XCTAssertEqual(model.fallbackBrowserAppURL, URL(fileURLWithPath: "/Applications/Zen.app"))
+        XCTAssertEqual(model.fallbackBrowserRoute, .zenContainer(containerName: "Work"))
         XCTAssertEqual(
             model.ruleDrafts,
             [
@@ -34,7 +36,46 @@ final class PreferencesModelTests: XCTestCase {
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
                     targetKind: .helium,
+                    fallbackBrowserRoute: .plain,
                     heliumProfileDirectory: "Profile 1"
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testLoadPopulatesFallbackFirefoxProfileRuleFromStoredConfig() throws {
+        let config = RouterConfig(
+            fallbackBrowserBundleID: "org.mozilla.firefox",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            fallbackBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+                    sourceBundleID: "com.apple.mail",
+                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default")
+                ),
+            ]
+        )
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: config),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
+        )
+
+        try model.load()
+
+        XCTAssertEqual(
+            model.ruleDrafts,
+            [
+                PreferencesRuleDraft(
+                    id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+                    sourceBundleID: "com.apple.mail",
+                    targetKind: .fallbackBrowser,
+                    fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
+                    heliumProfileDirectory: ""
                 ),
             ]
         )
@@ -157,21 +198,26 @@ final class PreferencesModelTests: XCTestCase {
         model.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleTargetKind(id: ruleID, targetKind: .helium)
-        model.updateRuleHeliumProfileDirectory(id: ruleID, value: "Profile 1")
+        model.updateRuleFallbackBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
+        let firefoxURL = try makeApplicationBundle(
+            name: "Firefox",
+            bundleIdentifier: "org.mozilla.firefox"
+        )
+        try model.setFallbackBrowser(applicationURL: firefoxURL)
 
         try model.save()
 
         XCTAssertEqual(
             store.savedConfig,
             RouterConfig(
-                fallbackBrowserBundleID: "com.apple.Safari",
-                fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                fallbackBrowserBundleID: "org.mozilla.firefox",
+                fallbackBrowserAppURL: firefoxURL,
+                fallbackBrowserRoute: .plain,
                 rules: [
                     SourceAppRule(
                         id: ruleID,
                         sourceBundleID: "com.tinyspeck.slackmacgap",
-                        target: .helium(profileDirectory: "Profile 1")
+                        target: .fallbackBrowser
                     ),
                 ]
             )
@@ -214,6 +260,39 @@ final class PreferencesModelTests: XCTestCase {
                     config: RouterConfig(
                         fallbackBrowserBundleID: "com.apple.Safari",
                         fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        fallbackBrowserRoute: .plain,
+                        rules: []
+                    )
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testTestFallbackBrowserUsesConfiguredFallbackRoute() async throws {
+        let launcher = PreferencesBrowserLauncherSpy()
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: launcher,
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        model.fallbackBrowserBundleID = "org.mozilla.firefox"
+        model.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Firefox.app")
+        model.fallbackBrowserRoute = .firefoxProfile(profileKey: "Profiles/work.default")
+        model.sampleURLString = "https://example.com/fallback"
+
+        try await model.testFallbackBrowser()
+
+        XCTAssertEqual(
+            launcher.openCalls,
+            [
+                PreferencesBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/fallback")!,
+                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
+                    config: RouterConfig(
+                        fallbackBrowserBundleID: "org.mozilla.firefox",
+                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+                        fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
                         rules: []
                     )
                 ),
@@ -248,6 +327,7 @@ final class PreferencesModelTests: XCTestCase {
                     config: RouterConfig(
                         fallbackBrowserBundleID: "com.apple.Safari",
                         fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        fallbackBrowserRoute: .plain,
                         rules: [
                             SourceAppRule(
                                 id: ruleID,
@@ -259,6 +339,71 @@ final class PreferencesModelTests: XCTestCase {
                 ),
             ]
         )
+    }
+
+    @MainActor
+    func testTestRuleUsesDraftFallbackZenContainerTarget() async throws {
+        let launcher = PreferencesBrowserLauncherSpy()
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: launcher,
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        let zenURL = try makeApplicationBundle(
+            name: "Zen",
+            bundleIdentifier: FirefoxBrowserAppSupportPath.zenBrowserBundleID
+        )
+        try model.setFallbackBrowser(applicationURL: zenURL)
+        model.sampleURLString = "https://example.com/work"
+        let ruleID = model.addRule()
+        model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
+        model.updateRuleFallbackBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
+
+        try await model.testRule(id: ruleID)
+
+        XCTAssertEqual(
+            launcher.openCalls,
+            [
+                PreferencesBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/work")!,
+                    target: .fallbackBrowserZenContainer(containerName: "Work"),
+                    config: RouterConfig(
+                        fallbackBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
+                        fallbackBrowserAppURL: zenURL,
+                        fallbackBrowserRoute: .plain,
+                        rules: [
+                            SourceAppRule(
+                                id: ruleID,
+                                sourceBundleID: "com.tinyspeck.slackmacgap",
+                                target: .fallbackBrowserZenContainer(containerName: "Work")
+                            ),
+                        ]
+                    )
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testSetFallbackBrowserNormalizesDefaultZenContainerRouteWhenSwitchingToNonZenBrowser() async throws {
+        let zenURL = try makeApplicationBundle(
+            name: "Zen",
+            bundleIdentifier: FirefoxBrowserAppSupportPath.zenBrowserBundleID
+        )
+        let safariURL = try makeApplicationBundle(
+            name: "Safari",
+            bundleIdentifier: "com.apple.Safari"
+        )
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        try model.setFallbackBrowser(applicationURL: zenURL)
+        model.updateFallbackBrowserRoute(.zenContainer(containerName: "Work"))
+        try model.setFallbackBrowser(applicationURL: safariURL)
+
+        XCTAssertEqual(model.fallbackBrowserRoute, .plain)
     }
 
     @MainActor
