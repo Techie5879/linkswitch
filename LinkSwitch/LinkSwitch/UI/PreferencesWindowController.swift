@@ -974,16 +974,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         (sourceLabelRow.arrangedSubviews[0] as? NSTextField)?.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
         (sourceLabelRow.arrangedSubviews[0] as? NSTextField)?.textColor = .secondaryLabelColor
 
-        let sourceStack = NSStackView(views: [sourceLabelRow, sourcePickerRow, manualBundleIDStack])
-        sourceStack.orientation = .vertical
-        sourceStack.alignment = .leading
-        sourceStack.spacing = 4
-
-        // Arrow
+        // Arrow (only on the picker row, aligned with icon + popup rows — not with section titles)
         let arrowLabel = NSTextField(labelWithString: "→")
         arrowLabel.font = .systemFont(ofSize: 20, weight: .light)
         arrowLabel.textColor = .tertiaryLabelColor
         arrowLabel.setContentHuggingPriority(.required, for: .horizontal)
+        arrowLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         // Target section: [icon] [popup button]
         targetKindPopupButton.addItems(withTitles: PreferencesRuleTargetKind.allCases.map(\.displayName))
@@ -1014,17 +1010,36 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         (targetLabelRow.arrangedSubviews[0] as? NSTextField)?.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
         (targetLabelRow.arrangedSubviews[0] as? NSTextField)?.textColor = .secondaryLabelColor
 
-        let targetStack = NSStackView(views: [targetLabelRow, targetPickerRow, profileContainerView])
-        targetStack.orientation = .vertical
-        targetStack.alignment = .leading
-        targetStack.spacing = 4
+        // Three-row grid so labels sit above the arrow column and the arrow aligns with the picker row.
+        let arrowColumnWidth: CGFloat = 28
+        let arrowColumnTopSpacer = NSView()
+        arrowColumnTopSpacer.translatesAutoresizingMaskIntoConstraints = false
+        let arrowColumnBottomSpacer = NSView()
+        arrowColumnBottomSpacer.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            arrowColumnTopSpacer.widthAnchor.constraint(equalToConstant: arrowColumnWidth),
+            arrowColumnBottomSpacer.widthAnchor.constraint(equalToConstant: arrowColumnWidth),
+        ])
 
-        // Main content row
-        let contentRow = NSStackView(views: [sourceStack, arrowLabel, targetStack])
-        contentRow.orientation = .horizontal
-        contentRow.alignment = .top
-        contentRow.spacing = 16
-        contentRow.distribution = .fill
+        let labelsRow = NSStackView(views: [sourceLabelRow, arrowColumnTopSpacer, targetLabelRow])
+        labelsRow.orientation = .horizontal
+        labelsRow.alignment = .centerY
+        labelsRow.spacing = 16
+
+        let pickerRow = NSStackView(views: [sourcePickerRow, arrowLabel, targetPickerRow])
+        pickerRow.orientation = .horizontal
+        pickerRow.alignment = .centerY
+        pickerRow.spacing = 16
+
+        let bottomRow = NSStackView(views: [manualBundleIDStack, arrowColumnBottomSpacer, profileContainerView])
+        bottomRow.orientation = .horizontal
+        bottomRow.alignment = .centerY
+        bottomRow.spacing = 16
+
+        let contentColumn = NSStackView(views: [labelsRow, pickerRow, bottomRow])
+        contentColumn.orientation = .vertical
+        contentColumn.alignment = .leading
+        contentColumn.spacing = 4
 
         // Action buttons (right-aligned)
         let testButton = NSButton(title: "Test Rule", target: self, action: #selector(testRule(_:)))
@@ -1043,7 +1058,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         buttonsRow.alignment = .centerY
         buttonsRow.spacing = 8
 
-        let rootStack = NSStackView(views: [contentRow, buttonsRow])
+        let rootStack = NSStackView(views: [contentColumn, buttonsRow])
         rootStack.translatesAutoresizingMaskIntoConstraints = false
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
@@ -1053,7 +1068,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
         // Both rows fill the card width.
         NSLayoutConstraint.activate([
-            contentRow.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            contentColumn.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             buttonsRow.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
         ])
         NSLayoutConstraint.activate([
