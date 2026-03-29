@@ -226,6 +226,25 @@ final class PreferencesModel {
         )
     }
 
+    /// Sets the configured fallback browser as the system default handler for `http` and `https`.
+    func registerFallbackBrowserAsDefaultHandler() async throws -> DefaultHandlerRegistrationResult {
+        AppLogger.info("Registering fallback browser as the default handler for http/https from preferences", category: .launch)
+        guard let applicationURL = fallbackBrowserAppURL else {
+            AppLogger.error("Cannot register fallback browser as default handler without a selected fallback app", category: .launch)
+            throw PreferencesModelError.missingFallbackBrowserSelection
+        }
+        guard !fallbackBrowserBundleID.isEmpty else {
+            AppLogger.error("Cannot register fallback browser as default handler without a bundle identifier", category: .launch)
+            throw PreferencesModelError.missingFallbackBrowserSelection
+        }
+
+        return try await launchServicesBridge.setDefaultHandler(
+            applicationURL: applicationURL,
+            applicationBundleIdentifier: fallbackBrowserBundleID,
+            urlSchemes: ["http", "https"]
+        )
+    }
+
     private func updateRule(id: UUID, mutate: (inout PreferencesRuleDraft) -> Void) {
         guard let index = ruleDrafts.firstIndex(where: { $0.id == id }) else {
             AppLogger.error("Attempted to update missing preferences rule \(id)", category: .config)

@@ -323,6 +323,53 @@ final class PreferencesModelTests: XCTestCase {
         XCTAssertEqual(provider.defaultHandlerSetCalls, [])
     }
 
+    @MainActor
+    func testRegisterFallbackBrowserAsDefaultHandlerRegistersHTTPAndHTTPS() async throws {
+        let provider = PreferencesLaunchServicesProviderSpy()
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchServicesBridge: LaunchServicesBridge(provider: provider)
+        )
+        let zenURL = try makeApplicationBundle(
+            name: "Zen",
+            bundleIdentifier: "app.zen-browser.zen"
+        )
+        try model.setFallbackBrowser(applicationURL: zenURL)
+
+        let result = try await model.registerFallbackBrowserAsDefaultHandler()
+
+        XCTAssertEqual(result, .registered)
+        XCTAssertEqual(
+            provider.defaultHandlerSetCalls,
+            [
+                PreferencesLaunchServicesProviderSpy.SetCall(applicationURL: zenURL, urlScheme: "http"),
+                PreferencesLaunchServicesProviderSpy.SetCall(applicationURL: zenURL, urlScheme: "https"),
+            ]
+        )
+    }
+
+    @MainActor
+    func testRegisterFallbackBrowserAsDefaultHandlerThrowsWhenNoFallbackSelected() async throws {
+        let provider = PreferencesLaunchServicesProviderSpy()
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchServicesBridge: LaunchServicesBridge(provider: provider)
+        )
+
+        do {
+            _ = try await model.registerFallbackBrowserAsDefaultHandler()
+            XCTFail("Expected missingFallbackBrowserSelection")
+        } catch PreferencesModelError.missingFallbackBrowserSelection {
+            XCTAssertEqual(provider.defaultHandlerSetCalls, [])
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     private func makeApplicationBundle(name: String, bundleIdentifier: String) throws -> URL {
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

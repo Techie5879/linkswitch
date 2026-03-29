@@ -65,8 +65,27 @@ final class PreferencesViewController: NSViewController {
     private let fallbackBrowserPopup = NSPopUpButton()
 
     // MARK: Handler status card controls
-    private let httpHandlerLabel = NSTextField(labelWithString: "")
-    private let httpsHandlerLabel = NSTextField(labelWithString: "")
+    private let handlerStatusImageView: NSImageView = {
+        let iv = NSImageView()
+        iv.imageScaling = .scaleProportionallyDown
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
+    private let handlerPrimaryLabel = NSTextField(labelWithString: "")
+    private let handlerSecondaryLabel = NSTextField(wrappingLabelWithString: "")
+
+    private lazy var registerHandlerButton: NSButton = makeButton(
+        title: "Set LinkSwitch as HTTP/HTTPS Handler",
+        action: #selector(registerLinkSwitchAsDefaultHandler(_:)),
+        accessibilityIdentifier: "preferences.registerHandlerButton"
+    )
+
+    private lazy var setFallbackAsDefaultHandlerButton: NSButton = makeButton(
+        title: "Set Fallback Browser as Default Handler",
+        action: #selector(setFallbackBrowserAsDefaultHandler(_:)),
+        accessibilityIdentifier: "preferences.setFallbackAsDefaultHandlerButton"
+    )
 
     // MARK: Misc controls
     private let configPathLabel = NSTextField(wrappingLabelWithString: "")
@@ -276,28 +295,38 @@ final class PreferencesViewController: NSViewController {
 
         let titleLabel = makeSectionLabel("URL Handler Status")
 
-        httpHandlerLabel.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        httpHandlerLabel.textColor = .secondaryLabelColor
-        httpHandlerLabel.lineBreakMode = .byTruncatingMiddle
+        handlerPrimaryLabel.font = .systemFont(ofSize: NSFont.systemFontSize)
+        handlerPrimaryLabel.textColor = .labelColor
 
-        httpsHandlerLabel.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
-        httpsHandlerLabel.textColor = .secondaryLabelColor
-        httpsHandlerLabel.lineBreakMode = .byTruncatingMiddle
+        handlerSecondaryLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        handlerSecondaryLabel.textColor = .secondaryLabelColor
 
-        let registerButton = makeButton(
-            title: "Set LinkSwitch as HTTP/HTTPS Handler",
-            action: #selector(registerLinkSwitchAsDefaultHandler(_:)),
-            accessibilityIdentifier: "preferences.registerHandlerButton"
-        )
+        let textStack = NSStackView(views: [handlerPrimaryLabel, handlerSecondaryLabel])
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 4
 
-        let contentStack = NSStackView(views: [titleLabel, httpHandlerLabel, httpsHandlerLabel, registerButton])
+        let statusRow = NSStackView(views: [handlerStatusImageView, textStack])
+        statusRow.translatesAutoresizingMaskIntoConstraints = false
+        statusRow.orientation = .horizontal
+        statusRow.alignment = .top
+        statusRow.spacing = 12
+
+        let buttonsStack = NSStackView(views: [registerHandlerButton, setFallbackAsDefaultHandlerButton])
+        buttonsStack.orientation = .vertical
+        buttonsStack.alignment = .leading
+        buttonsStack.spacing = 8
+
+        let contentStack = NSStackView(views: [titleLabel, statusRow, buttonsStack])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
-        contentStack.spacing = 8
+        contentStack.spacing = 12
 
         card.addSubview(contentStack)
         NSLayoutConstraint.activate([
+            handlerStatusImageView.widthAnchor.constraint(equalToConstant: 32),
+            handlerStatusImageView.heightAnchor.constraint(equalToConstant: 32),
             contentStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
             contentStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
             contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
@@ -390,11 +419,54 @@ final class PreferencesViewController: NSViewController {
 
         refreshFallbackBrowserDisplay()
         refreshFallbackBrowserPopup()
-
-        httpHandlerLabel.stringValue = "http   → \(model.currentHandlerBundleID(forURLScheme: "http") ?? "unavailable")"
-        httpsHandlerLabel.stringValue = "https → \(model.currentHandlerBundleID(forURLScheme: "https") ?? "unavailable")"
+        refreshHandlerStatusDisplay()
 
         refreshRules()
+    }
+
+    private func refreshHandlerStatusDisplay() {
+        let selfBundleID = Bundle.main.bundleIdentifier
+        let httpID = model.currentHandlerBundleID(forURLScheme: "http")
+        let httpsID = model.currentHandlerBundleID(forURLScheme: "https")
+        let symbolConfig = NSImage.SymbolConfiguration(pointSize: 28, weight: .regular)
+
+        let linkSwitchIsDefault =
+            selfBundleID != nil && httpID == selfBundleID && httpsID == selfBundleID
+
+        AppLogger.info(
+            "Handler status refresh: linkSwitchIsDefault=\(linkSwitchIsDefault) http=\(httpID ?? "nil") https=\(httpsID ?? "nil")",
+            category: .app
+        )
+
+        if linkSwitchIsDefault {
+            if let img = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil) {
+                handlerStatusImageView.image = img.withSymbolConfiguration(symbolConfig)
+            }
+            handlerStatusImageView.contentTintColor = .systemGreen
+            handlerPrimaryLabel.stringValue = "LinkSwitch is the default web browser"
+            handlerSecondaryLabel.stringValue = "Handles http and https links."
+            registerHandlerButton.isHidden = true
+            setFallbackAsDefaultHandlerButton.isHidden = false
+            let hasFallback = model.fallbackBrowserAppURL != nil && !model.fallbackBrowserBundleID.isEmpty
+            let fallbackAlreadyDefault =
+                (httpID == model.fallbackBrowserBundleID && httpsID == model.fallbackBrowserBundleID)
+            setFallbackAsDefaultHandlerButton.isEnabled = hasFallback && !fallbackAlreadyDefault
+        } else {
+            if let img = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil) {
+                handlerStatusImageView.image = img.withSymbolConfiguration(symbolConfig)
+            }
+            handlerStatusImageView.contentTintColor = .systemOrange
+            handlerPrimaryLabel.stringValue = "LinkSwitch is not the default handler"
+            if let h = httpID, let s = httpsID, h != s {
+                handlerSecondaryLabel.stringValue =
+                    "http and https point to different apps. Set LinkSwitch below to route links through LinkSwitch."
+            } else {
+                handlerSecondaryLabel.stringValue =
+                    "Set LinkSwitch as the default handler to open links through LinkSwitch."
+            }
+            registerHandlerButton.isHidden = false
+            setFallbackAsDefaultHandlerButton.isHidden = true
+        }
     }
 
     private func refreshFallbackBrowserDisplay() {
@@ -525,6 +597,7 @@ final class PreferencesViewController: NSViewController {
             AppLogger.info("Fallback browser changed to \(browser.bundleID) via popup", category: .app)
             model.setFallbackBrowser(discoveredBrowser: browser)
             refreshFallbackBrowserDisplay()
+            refreshHandlerStatusDisplay()
         }
     }
 
@@ -616,6 +689,32 @@ final class PreferencesViewController: NSViewController {
                 }
             } catch {
                 self?.presentPreferencesError(error, message: "Could not register LinkSwitch as the default handler.")
+            }
+        }
+    }
+
+    @objc private func setFallbackBrowserAsDefaultHandler(_ sender: Any?) {
+        AppLogger.info("User requested setting fallback browser as default http/https handler", category: .app)
+        Task { @MainActor [weak self] in
+            do {
+                let result = try await self?.model.registerFallbackBrowserAsDefaultHandler()
+                self?.refreshUI()
+                switch result {
+                case .registered:
+                    self?.setStatus("Set the fallback browser as the default handler for http and https.")
+                case .alreadyRegistered:
+                    self?.setStatus(
+                        "The fallback browser is already the default handler for http and https.",
+                        style: .warning
+                    )
+                case nil:
+                    break
+                }
+            } catch {
+                self?.presentPreferencesError(
+                    error,
+                    message: "Could not set the fallback browser as the default handler."
+                )
             }
         }
     }
