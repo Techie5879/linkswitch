@@ -19,6 +19,7 @@ Single routing pipeline for incoming URLs. Sender detection is fragile; document
 ## Workflow
 
 TDD where practical: tests updated with code and must pass before done. Subagents OK for parallel work; primary agent integrates and **verifies** subagent changes.
+- After feature changes or bug fixes, always rebuild and reinstall the dev app before finishing the task.
 - If the next step requires the user to do something in Xcode UI, stop and ask for that action explicitly, then wait for the user to confirm it is done before continuing implementation.
 
 ## Observability

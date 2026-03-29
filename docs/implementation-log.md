@@ -2,7 +2,10 @@
 
 ## Current plan baseline
 
-Primary source of truth: `.cursor/plans/native-macos-link-router.plan.md`
+Primary source of truth:
+
+- `.cursor/plans/native-macos-link-router.plan.md` for the core routing and launch work
+- `.cursor/plans/menu_bar_migration_6423d7db.plan.md` for the status-item-first app shell migration
 
 Current Xcode layout from the plan:
 
@@ -12,6 +15,33 @@ Current Xcode layout from the plan:
 - UI tests: `LinkSwitch/LinkSwitchUITests/`
 
 ## Decisions
+
+### Add a status-item-first app shell
+
+Reason:
+
+- LinkSwitch should behave like a menu bar utility instead of a normal always-windowed Dock app.
+- The current launch window should remain available as an explicit surface, but not as the default launch experience.
+- The existing bug where closing the main window strands the app should be fixed in the same slice as the shell migration.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitch/Info.plist`
+- `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
+- `LinkSwitch/LinkSwitchUITests/LinkSwitchUITests.swift`
+- `LinkSwitch/LinkSwitchUITests/LinkSwitchUITestsLaunchTests.swift`
+- `docs/app-shell.md`
+
+Current shape:
+
+- `AppDelegate` now installs an `NSStatusItem` with `Preferences…` and `Quit LinkSwitch`.
+- The status item now uses a lightweight monochrome template icon derived from `app-icon.svg` instead of the temporary `LS` text title.
+- `Info.plist` sets `LSUIElement`, so the app is hidden from the Dock by default.
+- The main window is configured at launch with the embedded preferences UI and then hidden unless the UI-test launch argument requests a visible window.
+- `Preferences…` presents the app's single main window.
+- `applicationShouldHandleReopen(_:hasVisibleWindows:)` now restores the main window when the app is reopened with no visible windows.
+- UI tests explicitly opt into a visible main window through `--ui-test-show-main-window` instead of relying on the production launch behavior.
 
 ### Use the generated Xcode project as the source tree
 
@@ -144,10 +174,33 @@ Implemented in:
 
 Current shape:
 
-- The main window now exposes an `Open Preferences…` action, and the app menu Preferences item is wired programmatically.
-- `PreferencesWindowController` is code-built and supports fallback-browser selection, source-app rule CRUD, sample-URL test launches, current `http` / `https` handler inspection, and a button that calls `LaunchServicesBridge` to request LinkSwitch as the default web handler.
+- The app menu Preferences item is wired programmatically.
+- The preferences UI is code-built in `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift` and supports fallback-browser selection, source-app rule CRUD, sample-URL test launches, current `http` / `https` handler inspection, and a button that calls `LaunchServicesBridge` to request LinkSwitch as the default web handler.
 - `PreferencesModel` is the testable logic layer behind that UI and owns config loading, validation, persistence, test launches, and default-handler registration requests.
 - The app bundle now declares `http` and `https` in `CFBundleURLTypes`, and a host-bundle test verifies those schemes are present.
+- The newer app-shell migration keeps that preferences surface intact, but normal launch now starts from the menu bar status item and hides the main window by default.
+
+### Collapse UI to a single main window
+
+Reason:
+
+- The split between a lightweight main window and a separate preferences window added extra clicks without adding product value.
+- The app should now have one UI surface, with preferences visible as soon as the window opens.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift`
+- `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
+- `LinkSwitch/LinkSwitchUITests/LinkSwitchUITests.swift`
+- `docs/app-shell.md`
+
+Current shape:
+
+- The nib-backed main window remains the only `NSWindow` in the app shell.
+- The code-built preferences UI now lives inside that main window through `PreferencesViewController`.
+- `Preferences…` and reopen both converge on the same window presentation path.
+- UI automation now verifies that the visible main window already contains the preferences controls.
 
 ### Add in-process routing integration coverage
 

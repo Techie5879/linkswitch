@@ -27,7 +27,7 @@ The runtime log file exists because XCTest and `xcodebuild` do not always surfac
 
 ## Current development requirement
 
-Because the generated Xcode target currently has App Sandbox enabled, project-local runtime logging requires turning that sandbox setting off in Xcode. That is a development-time choice so the repo-local `logs/` folder can be used while the app is still being built out.
+Because project-local runtime logging writes to the repo checkout, App Sandbox stays disabled during the current development phase. That is a development-time choice so the repo-local `logs/` folder can be used while the app is still being built out.
 
 ## Decision: disable App Sandbox during current development phase
 
@@ -52,6 +52,9 @@ Later:
 Logging has been added to:
 
 - app lifecycle in `AppDelegate`
+- status item installation and status-item menu actions in `AppDelegate`
+- main-window hide/show decisions and reopen handling in `AppDelegate`
+- single-window lifecycle close notifications in `AppDelegate`
 - config path resolution, load, and save in `RouterConfigStore`
 - source-app sender resolution in `SourceAppResolver`
 - route selection in `RuleEngine`

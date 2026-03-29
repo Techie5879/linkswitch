@@ -13,6 +13,7 @@ It also explains what each signing/distribution mode entails and which one is re
 Before choosing an install path, keep these current project details in mind:
 
 - The app registers itself as the `http` / `https` handler from Preferences.
+- The app now launches as a menu bar utility and hides its Dock icon by default.
 - The saved router config lives at `~/Library/Application Support/LinkSwitch/router-config.json`.
 - The current development logger also writes to `logs/runtime.log` in the repo checkout.
 - App Sandbox is currently disabled for development so repo-local logging works.
@@ -110,7 +111,7 @@ Use this when you are coding or running tests.
 
 1. Open `LinkSwitch/LinkSwitch.xcodeproj` in Xcode.
 2. Build and run the app with Xcode's default automatic/local signing.
-3. Open Preferences from the main window or the app menu.
+3. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 4. Choose a fallback browser.
 5. Add source-app rules as needed.
 6. Use `Test Fallback Browser` and `Test Rule` for fast validation.
@@ -133,7 +134,7 @@ Use this when you want to test actual `http` / `https` handler registration on y
 2. Copy the built app bundle to a stable location before registering it:
    `~/Applications/LinkSwitch Dev.app` is a good choice.
 3. Launch that copied app directly.
-4. Open Preferences.
+4. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 5. Choose the fallback browser.
 6. Save the config.
 7. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
@@ -173,10 +174,11 @@ What the tester should do after install:
 
 1. Move the app to `/Applications` or `~/Applications`.
 2. Open it once manually.
-3. In Preferences, choose the fallback browser.
-4. Add any source-app rule such as `Slack -> Helium(profile)`.
-5. Save.
-6. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
+3. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
+4. Choose the fallback browser.
+5. Add any source-app rule such as `Slack -> Helium(profile)`.
+6. Save.
+7. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
 
 What this path does not give you:
 
@@ -202,7 +204,7 @@ For a real release, use direct distribution with Developer ID signing and notari
 1. Download the notarized release artifact.
 2. Move `LinkSwitch.app` to `/Applications`.
 3. Launch LinkSwitch.
-4. Open Preferences.
+4. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 5. Choose the fallback browser.
 6. Add any source-app rules you want.
 7. Save.
@@ -238,7 +240,7 @@ If you want one concrete recommendation:
 After any successful install, the setup flow is:
 
 1. Launch LinkSwitch.
-2. Open Preferences.
+2. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 3. Choose the fallback browser.
 4. Add source-app rules.
 5. Save.

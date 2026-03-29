@@ -48,6 +48,39 @@ final class AppDelegateTests: XCTestCase {
             ]
         )
     }
+
+    @MainActor
+    func testApplicationShouldHandleReopenShowsMainWindowWhenNoVisibleWindows() {
+        let appDelegate = AppDelegate()
+        let testWindow = makeTestWindow()
+        appDelegate.window = testWindow
+
+        let shouldContinueDefaultHandling = appDelegate.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false)
+
+        XCTAssertFalse(shouldContinueDefaultHandling)
+        XCTAssertTrue(testWindow.isVisible)
+    }
+
+    @MainActor
+    func testApplicationShouldHandleReopenDefersToSystemWhenVisibleWindowsExist() {
+        let appDelegate = AppDelegate()
+        appDelegate.window = makeTestWindow()
+
+        let shouldContinueDefaultHandling = appDelegate.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: true)
+
+        XCTAssertTrue(shouldContinueDefaultHandling)
+    }
+
+    @MainActor
+    func testShowPreferencesWindowShowsMainWindow() {
+        let appDelegate = AppDelegate()
+        let testWindow = makeTestWindow()
+        appDelegate.window = testWindow
+
+        appDelegate.showPreferencesWindow(nil)
+
+        XCTAssertTrue(testWindow.isVisible)
+    }
 }
 
 private struct StubSourceBundleIDResolver: SourceBundleIDResolving {
@@ -77,4 +110,14 @@ private final class URLIntakeHandlerSpy: URLIntakeHandling {
         calls.append(Call(urls: urls, sourceBundleID: sourceBundleID))
         callsExpectation.fulfill()
     }
+}
+
+@MainActor
+private func makeTestWindow() -> NSWindow {
+    NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+        styleMask: [.titled, .closable, .resizable],
+        backing: .buffered,
+        defer: false
+    )
 }

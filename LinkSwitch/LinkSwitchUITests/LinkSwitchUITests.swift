@@ -23,20 +23,22 @@ final class LinkSwitchUITests: XCTestCase {
     }
 
     @MainActor
-    func testPreferencesWindowOpensFromKeyboardShortcut() throws {
+    func testMainWindowShowsPreferencesInUITestLaunchMode() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-show-main-window"]
         app.launch()
 
-        app.buttons["Open Preferences…"].click()
-
-        XCTAssertTrue(app.windows["LinkSwitch Preferences"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.windows["LinkSwitch"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.popUpButtons["preferences.fallbackBrowserPopup"].waitForExistence(timeout: 2.0))
     }
 
     @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let app = XCUIApplication()
+            app.launchArguments = ["--ui-test-show-main-window"]
+            app.launch()
         }
     }
 }
