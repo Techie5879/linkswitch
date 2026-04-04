@@ -1,6 +1,6 @@
 # LinkSwitch
 
-macOS app that handles `http` / `https` links and routes them by **which app opened the URL** (e.g. Slack vs. everything else). Unmatched traffic goes to a **fallback browser** you pick in preferences; rules and fallback are stored in config, not inferred from the system default after LinkSwitch is the handler.
+macOS app that handles `http` / `https` links and routes them by **which app opened the URL** (e.g. Slack vs. everything else). Unmatched traffic goes to a **default browser** you pick in preferences; rules and the default browser are stored in config, not inferred from the system default after LinkSwitch is the handler.
 
 Built with Swift and AppKit. Project: `LinkSwitch/LinkSwitch.xcodeproj`.
 

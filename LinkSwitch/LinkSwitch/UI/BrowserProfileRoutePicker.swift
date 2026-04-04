@@ -5,51 +5,51 @@ import Foundation
 enum BrowserProfileRouteSelectionMode: Equatable {
     case none
     case heliumProfile
-    case fallbackHeliumProfile
-    case fallbackFirefoxProfile
-    case fallbackZenContainer
+    case defaultHeliumProfile
+    case defaultFirefoxProfile
+    case defaultZenContainer
 
-    /// Rule row: depends on target kind and the configured fallback browser.
+    /// Rule row: depends on target kind and the configured default browser.
     static func mode(
         targetKind: PreferencesRuleTargetKind,
-        fallbackBrowserBundleID: String
+        defaultBrowserBundleID: String
     ) -> BrowserProfileRouteSelectionMode {
         switch targetKind {
         case .helium:
             return .heliumProfile
-        case .fallbackBrowser:
-            return mode(forFallbackBrowserBundleID: fallbackBrowserBundleID)
+        case .defaultBrowser:
+            return mode(forDefaultBrowserBundleID: defaultBrowserBundleID)
         }
     }
 
-    /// Default fallback browser card: only the fallback browser bundle ID matters.
-    static func mode(forFallbackBrowserBundleID bundleID: String) -> BrowserProfileRouteSelectionMode {
-        switch FallbackBrowserProfileSupport.forBundleID(bundleID) {
+    /// Default browser card: only the configured browser bundle ID matters.
+    static func mode(forDefaultBrowserBundleID bundleID: String) -> BrowserProfileRouteSelectionMode {
+        switch DefaultBrowserProfileSupport.forBundleID(bundleID) {
         case .plainOnly:
             return .none
         case .heliumProfile:
-            return .fallbackHeliumProfile
+            return .defaultHeliumProfile
         case .firefoxProfile:
-            return .fallbackFirefoxProfile
+            return .defaultFirefoxProfile
         case .zenContainer:
-            return .fallbackZenContainer
+            return .defaultZenContainer
         }
     }
 
     var sectionTitle: String {
         switch self {
-        case .fallbackZenContainer:
+        case .defaultZenContainer:
             return "Container"
-        case .none, .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
+        case .none, .heliumProfile, .defaultHeliumProfile, .defaultFirefoxProfile:
             return "Profile"
         }
     }
 
     var emptyMessage: String {
         switch self {
-        case .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
+        case .heliumProfile, .defaultHeliumProfile, .defaultFirefoxProfile:
             return "No profiles were found."
-        case .fallbackZenContainer:
+        case .defaultZenContainer:
             return "No containers were found."
         case .none:
             return ""
@@ -58,9 +58,9 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var readFailurePrefix: String {
         switch self {
-        case .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
+        case .heliumProfile, .defaultHeliumProfile, .defaultFirefoxProfile:
             return "Could not read profiles"
-        case .fallbackZenContainer:
+        case .defaultZenContainer:
             return "Could not read containers"
         case .none:
             return "Could not read options"
@@ -69,7 +69,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var includesBrowserDefaultCard: Bool {
         switch self {
-        case .fallbackHeliumProfile, .fallbackFirefoxProfile, .fallbackZenContainer:
+        case .defaultHeliumProfile, .defaultFirefoxProfile, .defaultZenContainer:
             return true
         case .none, .heliumProfile:
             return false
@@ -77,8 +77,18 @@ enum BrowserProfileRouteSelectionMode: Equatable {
     }
 
     /// The empty key selects the plain browser open path (no profile/container targeting).
-    static func browserDefaultCard() -> BrowserProfile {
-        BrowserProfile(profileKey: "", displayName: "Browser Default")
+    static func browserDefaultCard(for mode: BrowserProfileRouteSelectionMode) -> BrowserProfile {
+        let displayName: String
+        switch mode {
+        case .defaultZenContainer:
+            displayName = "No Container"
+        case .defaultHeliumProfile, .defaultFirefoxProfile:
+            displayName = "No Profile"
+        case .none, .heliumProfile:
+            displayName = "Default Browser"
+        }
+
+        return BrowserProfile(profileKey: "", displayName: displayName)
     }
 }
 
@@ -86,7 +96,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 struct BrowserProfileCardLoadResult {
     let displayedProfiles: [BrowserProfile]
     let errorMessage: String?
-    /// Short label for logging (e.g. "fallback browser profile row", "default fallback browser card").
+    /// Short label for logging (e.g. "default browser profile row", "default browser card").
     let logContext: String
 }
 
@@ -95,7 +105,7 @@ enum BrowserProfileRoutePicker {
     /// previously embedded in `PreferencesRuleRowView.refreshProfileCards()`.
     static func loadProfileCards(
         mode: BrowserProfileRouteSelectionMode,
-        fallbackBrowserBundleID: String
+        defaultBrowserBundleID: String
     ) -> BrowserProfileCardLoadResult {
         let logContext: String
         switch mode {
@@ -126,16 +136,16 @@ enum BrowserProfileRoutePicker {
                     logContext: logContext
                 )
             }
-        case .fallbackHeliumProfile:
-            logContext = "Helium fallback profile row"
+        case .defaultHeliumProfile:
+            logContext = "Helium default-browser profile row"
             let factory = BrowserProfileDiscoveryFactory()
-            guard let discoverer = factory.makeDiscoverer(forBundleID: fallbackBrowserBundleID) else {
+            guard let discoverer = factory.makeDiscoverer(forBundleID: defaultBrowserBundleID) else {
                 AppLogger.error(
-                    "No Helium discoverer available for fallback bundle ID \(fallbackBrowserBundleID)",
+                    "No Helium discoverer available for default-browser bundle ID \(defaultBrowserBundleID)",
                     category: .app
                 )
                 return BrowserProfileCardLoadResult(
-                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard()],
+                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)],
                     errorMessage: "Profile discovery is not available for this browser.",
                     logContext: logContext
                 )
@@ -146,21 +156,21 @@ enum BrowserProfileRoutePicker {
             } catch {
                 AppLogger.error("\(logContext) discovery failed: \(error)", category: .app)
                 return BrowserProfileCardLoadResult(
-                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard()],
+                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)],
                     errorMessage: "\(mode.readFailurePrefix): \(error.localizedDescription)",
                     logContext: logContext
                 )
             }
-        case .fallbackFirefoxProfile:
-            logContext = "Firefox-family fallback profile row"
+        case .defaultFirefoxProfile:
+            logContext = "Firefox-family default-browser profile row"
             let factory = BrowserProfileDiscoveryFactory()
-            guard let discoverer = factory.makeDiscoverer(forBundleID: fallbackBrowserBundleID) else {
+            guard let discoverer = factory.makeDiscoverer(forBundleID: defaultBrowserBundleID) else {
                 AppLogger.error(
-                    "No Firefox-family discoverer available for fallback bundle ID \(fallbackBrowserBundleID)",
+                    "No Firefox-family discoverer available for default-browser bundle ID \(defaultBrowserBundleID)",
                     category: .app
                 )
                 return BrowserProfileCardLoadResult(
-                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard()],
+                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)],
                     errorMessage: "Profile discovery is not available for this browser.",
                     logContext: logContext
                 )
@@ -171,7 +181,7 @@ enum BrowserProfileRoutePicker {
             } catch {
                 AppLogger.error("\(logContext) discovery failed: \(error)", category: .app)
                 let displayed = mode.includesBrowserDefaultCard
-                    ? [BrowserProfileRouteSelectionMode.browserDefaultCard()]
+                    ? [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)]
                     : []
                 return BrowserProfileCardLoadResult(
                     displayedProfiles: displayed,
@@ -179,15 +189,15 @@ enum BrowserProfileRoutePicker {
                     logContext: logContext
                 )
             }
-        case .fallbackZenContainer:
-            logContext = "Zen container fallback row"
+        case .defaultZenContainer:
+            logContext = "Zen container default-browser row"
             do {
                 let options = try ZenContainerDiscovery().discoverProfiles()
                 return finishLoad(mode: mode, discoveredOptions: options, logContext: logContext)
             } catch {
                 AppLogger.error("\(logContext) discovery failed: \(error)", category: .app)
                 let displayed = mode.includesBrowserDefaultCard
-                    ? [BrowserProfileRouteSelectionMode.browserDefaultCard()]
+                    ? [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)]
                     : []
                 return BrowserProfileCardLoadResult(
                     displayedProfiles: displayed,
@@ -204,7 +214,7 @@ enum BrowserProfileRoutePicker {
         logContext: String
     ) -> BrowserProfileCardLoadResult {
         let displayedProfiles = mode.includesBrowserDefaultCard
-            ? [BrowserProfileRouteSelectionMode.browserDefaultCard()] + discoveredOptions
+            ? [BrowserProfileRouteSelectionMode.browserDefaultCard(for: mode)] + discoveredOptions
             : discoveredOptions
 
         if discoveredOptions.isEmpty {

@@ -15,9 +15,9 @@ protocol ProcessRunning {
 }
 
 enum BrowserLauncherError: Error, Equatable {
-    case unsupportedFallbackBrowserHeliumProfile(bundleID: String)
-    case unsupportedFallbackBrowserProfile(bundleID: String)
-    case unsupportedFallbackBrowserContainer(bundleID: String)
+    case unsupportedDefaultBrowserHeliumProfile(bundleID: String)
+    case unsupportedDefaultBrowserProfile(bundleID: String)
+    case unsupportedDefaultBrowserContainer(bundleID: String)
 }
 
 struct BrowserLauncher {
@@ -54,55 +54,55 @@ struct BrowserLauncher {
         )
 
         switch target {
-        case .fallbackBrowser:
+        case .defaultBrowser:
             AppLogger.info(
-                "Routing URL \(url.absoluteString) to fallback browser \(config.fallbackBrowserBundleID) at \(config.fallbackBrowserAppURL.path())",
+                "Routing URL \(url.absoluteString) to default browser \(config.defaultBrowserBundleID) at \(config.defaultBrowserAppURL.path())",
                 category: .launch
             )
-            try await workspaceLauncher.openURLs([url], withApplicationAt: config.fallbackBrowserAppURL)
-        case let .fallbackBrowserHeliumProfile(profileDirectory):
-            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .heliumProfile else {
+            try await workspaceLauncher.openURLs([url], withApplicationAt: config.defaultBrowserAppURL)
+        case let .defaultBrowserHeliumProfile(profileDirectory):
+            guard DefaultBrowserProfileSupport.forBundleID(config.defaultBrowserBundleID) == .heliumProfile else {
                 AppLogger.error(
-                    "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Helium profile routing",
+                    "Default browser bundle ID \(config.defaultBrowserBundleID) does not support Helium profile routing",
                     category: .launch
                 )
-                throw BrowserLauncherError.unsupportedFallbackBrowserHeliumProfile(bundleID: config.fallbackBrowserBundleID)
+                throw BrowserLauncherError.unsupportedDefaultBrowserHeliumProfile(bundleID: config.defaultBrowserBundleID)
             }
 
             let arguments = try HeliumLaunchArguments.make(url: url, profileDirectory: profileDirectory)
             AppLogger.info(
-                "Routing URL \(url.absoluteString) to fallback browser \(config.fallbackBrowserBundleID) at \(config.fallbackBrowserAppURL.path()) with Helium profile arguments \(arguments)",
+                "Routing URL \(url.absoluteString) to default browser \(config.defaultBrowserBundleID) at \(config.defaultBrowserAppURL.path()) with Helium profile arguments \(arguments)",
                 category: .launch
             )
-            try await workspaceLauncher.launchApplicationExecutable(at: config.fallbackBrowserAppURL, arguments: arguments)
-        case let .fallbackBrowserFirefoxProfile(profileKey):
-            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .firefoxProfile else {
+            try await workspaceLauncher.launchApplicationExecutable(at: config.defaultBrowserAppURL, arguments: arguments)
+        case let .defaultBrowserFirefoxProfile(profileKey):
+            guard DefaultBrowserProfileSupport.forBundleID(config.defaultBrowserBundleID) == .firefoxProfile else {
                 AppLogger.error(
-                    "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Firefox-style profile routing",
+                    "Default browser bundle ID \(config.defaultBrowserBundleID) does not support Firefox-style profile routing",
                     category: .launch
                 )
-                throw BrowserLauncherError.unsupportedFallbackBrowserProfile(bundleID: config.fallbackBrowserBundleID)
+                throw BrowserLauncherError.unsupportedDefaultBrowserProfile(bundleID: config.defaultBrowserBundleID)
             }
 
             let arguments = try FirefoxLaunchArguments.make(
                 url: url,
                 profileKey: profileKey,
-                browserBundleID: config.fallbackBrowserBundleID,
+                browserBundleID: config.defaultBrowserBundleID,
                 appSupportURL: appSupportURL,
                 homeDirectoryURL: homeDirectoryURL
             )
             AppLogger.info(
-                "Routing URL \(url.absoluteString) to fallback browser \(config.fallbackBrowserBundleID) at \(config.fallbackBrowserAppURL.path()) with Firefox-style profile arguments \(arguments)",
+                "Routing URL \(url.absoluteString) to default browser \(config.defaultBrowserBundleID) at \(config.defaultBrowserAppURL.path()) with Firefox-style profile arguments \(arguments)",
                 category: .launch
             )
-            try await workspaceLauncher.launchApplicationExecutable(at: config.fallbackBrowserAppURL, arguments: arguments)
-        case let .fallbackBrowserZenContainer(containerName):
-            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .zenContainer else {
+            try await workspaceLauncher.launchApplicationExecutable(at: config.defaultBrowserAppURL, arguments: arguments)
+        case let .defaultBrowserZenContainer(containerName):
+            guard DefaultBrowserProfileSupport.forBundleID(config.defaultBrowserBundleID) == .zenContainer else {
                 AppLogger.error(
-                    "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Zen container routing",
+                    "Default browser bundle ID \(config.defaultBrowserBundleID) does not support Zen container routing",
                     category: .launch
                 )
-                throw BrowserLauncherError.unsupportedFallbackBrowserContainer(bundleID: config.fallbackBrowserBundleID)
+                throw BrowserLauncherError.unsupportedDefaultBrowserContainer(bundleID: config.defaultBrowserBundleID)
             }
 
             let containerURL = try ZenContainerOpenURL.make(url: url, containerName: containerName)
@@ -110,7 +110,7 @@ struct BrowserLauncher {
                 "Routing URL \(url.absoluteString) to Zen container \(containerName) via \(containerURL.absoluteString)",
                 category: .launch
             )
-            try await workspaceLauncher.openURLs([containerURL], withApplicationAt: config.fallbackBrowserAppURL)
+            try await workspaceLauncher.openURLs([containerURL], withApplicationAt: config.defaultBrowserAppURL)
         case let .helium(profileDirectory):
             let applicationURL = try launchServicesBridge.applicationURL(forBundleIdentifier: Self.heliumBundleID)
             let arguments = try HeliumLaunchArguments.make(url: url, profileDirectory: profileDirectory)

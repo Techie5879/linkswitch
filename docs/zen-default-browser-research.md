@@ -1,8 +1,8 @@
-# Zen Fallback Research
+# Zen Default Browser Research
 
 ## Goal
 
-Figure out why the fallback-browser rule UI does not show the expected Zen entries `personal` and `work`, and determine whether LinkSwitch can route to them through a supported macOS launch path.
+Figure out why the default-browser rule UI does not show the expected Zen entries `personal` and `work`, and determine whether LinkSwitch can route to them through a supported macOS launch path.
 
 ## Local findings
 
@@ -72,7 +72,7 @@ The only documented external container handoff found was Firefox's third-party `
 
 ### Safe, supportable path
 
-LinkSwitch can safely add fallback-browser profile discovery for real Firefox-family profiles from `profiles.ini`. On a Firefox-family fallback browser that means exposing the actual `Name=` entries from `profiles.ini` and launching through the browser executable with an absolute `-profile` path.
+LinkSwitch can safely add default-browser profile discovery for real Firefox-family profiles from `profiles.ini`. On a Firefox-family default browser that means exposing the actual `Name=` entries from `profiles.ini` and launching through the browser executable with an absolute `-profile` path.
 
 If Zen is treated as a plain Firefox-profile browser, this machine would expose:
 
@@ -89,12 +89,12 @@ LinkSwitch should not pretend that Zen container identities `personal` and `work
 
 ## Implemented direction
 
-The implemented fallback-browser behavior now intentionally splits Firefox-family and Zen handling:
+The implemented default-browser behavior now intentionally splits Firefox-family and Zen handling:
 
-- Firefox-family fallback browsers use `profiles.ini` discovery and store the selected `Path=` key on the rule target.
-- Zen fallback browsers use `containers.json` discovery and surface the public container identities from the active/default Zen profile.
+- Firefox-family default browsers use `profiles.ini` discovery and store the selected `Path=` key on the rule target.
+- Zen default browsers use `containers.json` discovery and surface the public container identities from the active/default Zen profile.
 - Zen container launches are routed through the documented extension-style `ext+container:name=...&url=...` handoff, which keeps the implementation aligned with the only public external mechanism found during research.
-- The rule UI keeps a `Browser Default` card alongside the discovered Firefox profile or Zen container cards so a fallback rule can still target the plain browser open path.
+- The rule UI keeps a synthetic plain-route card (`No Profile` or `No Container`, depending on mode) alongside the discovered Firefox profile or Zen container cards so a default-browser rule can still target the plain browser open path.
 
 ## Current limitation
 

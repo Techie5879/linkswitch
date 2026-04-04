@@ -19,7 +19,7 @@ struct FirefoxLaunchArguments {
             category: .launch
         )
 
-        guard FirefoxBrowserAppSupportPath.supportsFallbackProfileRouting(forBundleID: browserBundleID) else {
+        guard FirefoxBrowserAppSupportPath.supportsDefaultProfileRouting(forBundleID: browserBundleID) else {
             AppLogger.error(
                 "FirefoxLaunchArguments does not support bundle ID \(browserBundleID)",
                 category: .launch

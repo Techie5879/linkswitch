@@ -79,7 +79,7 @@ echo "  ${INSTALL_APP_PATH}"
 echo
 echo "Next steps in LinkSwitch:"
 echo "  1. Open LinkSwitch from the menu bar item."
-echo "  2. Choose the fallback browser."
+echo "  2. Choose the default browser."
 echo "  3. Save the config."
 echo "  4. Click 'Set LinkSwitch as HTTP/HTTPS Handler'."
 echo

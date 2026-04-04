@@ -7,22 +7,22 @@ struct RuleEngine {
             category: .routing
         )
 
-        let fallbackTarget = config.fallbackBrowserRoute.browserTarget
+        let defaultTarget = config.defaultBrowserRoute.browserTarget
 
         guard let sourceBundleID = context.sourceBundleID else {
             AppLogger.info(
-                "No source bundle ID available, routing to fallback target \(fallbackTarget.description)",
+                "No source bundle ID available, routing to default-browser target \(defaultTarget.description)",
                 category: .routing
             )
-            return fallbackTarget
+            return defaultTarget
         }
 
         guard let target = config.rules.first(where: { $0.sourceBundleID == sourceBundleID })?.target else {
             AppLogger.info(
-                "No rule matched source \(sourceBundleID), routing to fallback target \(fallbackTarget.description)",
+                "No rule matched source \(sourceBundleID), routing to default-browser target \(defaultTarget.description)",
                 category: .routing
             )
-            return fallbackTarget
+            return defaultTarget
         }
 
         AppLogger.info("Matched source \(sourceBundleID) to target \(target.description)", category: .routing)

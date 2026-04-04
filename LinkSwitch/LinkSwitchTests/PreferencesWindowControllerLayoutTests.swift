@@ -6,9 +6,9 @@ import XCTest
 final class PreferencesWindowControllerLayoutTests: XCTestCase {
     func testRuleActionButtonsStayWithinVisibleWindowWidth() throws {
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,

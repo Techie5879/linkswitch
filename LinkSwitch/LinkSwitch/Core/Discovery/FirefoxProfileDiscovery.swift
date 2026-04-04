@@ -134,7 +134,7 @@ enum FirefoxBrowserAppSupportPath {
         }
     }
 
-    static func supportsFallbackProfileRouting(forBundleID bundleID: String) -> Bool {
+    static func supportsDefaultProfileRouting(forBundleID bundleID: String) -> Bool {
         guard bundleID != zenBrowserBundleID else {
             return false
         }

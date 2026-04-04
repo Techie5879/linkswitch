@@ -42,7 +42,7 @@ struct RouterConfigStore {
         let data = try Data(contentsOf: configFileURL)
         let config = try decoder.decode(RouterConfig.self, from: data)
         AppLogger.info(
-            "Loaded router config with fallback browser \(config.fallbackBrowserBundleID) and \(config.rules.count) rule(s)",
+            "Loaded router config with default browser \(config.defaultBrowserBundleID) and \(config.rules.count) rule(s)",
             category: .config
         )
         return config
@@ -56,7 +56,7 @@ struct RouterConfigStore {
         let data = try encoder.encode(config)
         try data.write(to: configFileURL, options: .atomic)
         AppLogger.info(
-            "Saved router config with fallback browser \(config.fallbackBrowserBundleID) and \(config.rules.count) rule(s)",
+            "Saved router config with default browser \(config.defaultBrowserBundleID) and \(config.rules.count) rule(s)",
             category: .config
         )
     }

@@ -2,46 +2,46 @@ import XCTest
 @testable import LinkSwitch
 
 final class BrowserLauncherTests: XCTestCase {
-    func testOpenFallbackBrowserUsesConfiguredBrowserAppURL() async throws {
+    func testOpenDefaultBrowserUsesConfiguredBrowserAppURL() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
             workspaceLauncher: workspaceLauncher
         )
-        let url = URL(string: "https://example.com/fallback")!
+        let url = URL(string: "https://example.com/default-browser")!
         let config = makeConfig()
 
-        try await launcher.open(url, target: .fallbackBrowser, config: config)
+        try await launcher.open(url, target: .defaultBrowser, config: config)
 
         XCTAssertEqual(
             workspaceLauncher.openURLCalls,
             [
                 WorkspaceLaunchSpy.OpenURLCall(
                     urls: [url],
-                    applicationURL: config.fallbackBrowserAppURL
+                    applicationURL: config.defaultBrowserAppURL
                 ),
             ]
         )
         XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
-    func testOpenFallbackHeliumProfileLaunchesConfiguredFallbackAppWithProfileArguments() async throws {
+    func testOpenDefaultBrowserHeliumProfileLaunchesConfiguredDefaultBrowserAppWithProfileArguments() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
             workspaceLauncher: workspaceLauncher
         )
-        let url = URL(string: "https://example.com/fallback-helium")!
+        let url = URL(string: "https://example.com/default-browser-helium")!
         let config = RouterConfig(
-            fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
         try await launcher.open(
             url,
-            target: .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1"),
+            target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
             config: config
         )
 
@@ -49,10 +49,10 @@ final class BrowserLauncherTests: XCTestCase {
             workspaceLauncher.launchApplicationExecutableCalls,
             [
                 WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
-                    applicationURL: config.fallbackBrowserAppURL,
+                    applicationURL: config.defaultBrowserAppURL,
                     arguments: [
                         "--profile-directory=Profile 1",
-                        "https://example.com/fallback-helium",
+                        "https://example.com/default-browser-helium",
                     ]
                 ),
             ]
@@ -94,7 +94,7 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
-    func testOpenFallbackFirefoxProfileLaunchesExecutableWithAbsoluteProfilePath() async throws {
+    func testOpenDefaultBrowserFirefoxProfileLaunchesExecutableWithAbsoluteProfilePath() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let appSupportURL = try makeFirefoxAppSupport(relativePath: "Firefox", profileKey: "Profiles/work.default")
         let launcher = BrowserLauncher(
@@ -105,19 +105,19 @@ final class BrowserLauncherTests: XCTestCase {
         )
         let url = URL(string: "https://example.com/firefox")!
         let config = RouterConfig(
-            fallbackBrowserBundleID: "org.mozilla.firefox",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "org.mozilla.firefox",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
-        try await launcher.open(url, target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"), config: config)
+        try await launcher.open(url, target: .defaultBrowserFirefoxProfile(profileKey: "Profiles/work.default"), config: config)
 
         XCTAssertEqual(
             workspaceLauncher.launchApplicationExecutableCalls,
             [
                 WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
-                    applicationURL: config.fallbackBrowserAppURL,
+                    applicationURL: config.defaultBrowserAppURL,
                     arguments: [
                         "-new-instance",
                         "-profile",
@@ -130,7 +130,7 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
-    func testOpenFallbackZenContainerUsesExtContainerURL() async throws {
+    func testOpenDefaultBrowserZenContainerUsesExtContainerURL() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
@@ -138,76 +138,76 @@ final class BrowserLauncherTests: XCTestCase {
         )
         let url = URL(string: "https://example.com/zen?tab=1")!
         let config = RouterConfig(
-            fallbackBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID,
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
-        try await launcher.open(url, target: .fallbackBrowserZenContainer(containerName: "Work"), config: config)
+        try await launcher.open(url, target: .defaultBrowserZenContainer(containerName: "Work"), config: config)
 
         XCTAssertEqual(
             workspaceLauncher.openURLCalls,
             [
                 WorkspaceLaunchSpy.OpenURLCall(
                     urls: [try XCTUnwrap(URL(string: "ext+container:name=Work&url=https%3A%2F%2Fexample.com%2Fzen%3Ftab%3D1"))],
-                    applicationURL: config.fallbackBrowserAppURL
+                    applicationURL: config.defaultBrowserAppURL
                 ),
             ]
         )
         XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
-    func testOpenFallbackFirefoxProfileThrowsForUnsupportedFallbackBrowserBundleID() async {
+    func testOpenDefaultBrowserFirefoxProfileThrowsForUnsupportedDefaultBrowserBundleID() async {
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
             workspaceLauncher: WorkspaceLaunchSpy()
         )
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
         do {
             try await launcher.open(
                 URL(string: "https://example.com/firefox")!,
-                target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
+                target: .defaultBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
                 config: config
             )
             XCTFail("Expected open to throw")
         } catch {
             XCTAssertEqual(
                 error as? BrowserLauncherError,
-                .unsupportedFallbackBrowserProfile(bundleID: "com.apple.Safari")
+                .unsupportedDefaultBrowserProfile(bundleID: "com.apple.Safari")
             )
         }
     }
 
-    func testOpenFallbackHeliumProfileThrowsForUnsupportedFallbackBrowserBundleID() async {
+    func testOpenDefaultBrowserHeliumProfileThrowsForUnsupportedDefaultBrowserBundleID() async {
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
             workspaceLauncher: WorkspaceLaunchSpy()
         )
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
         do {
             try await launcher.open(
                 URL(string: "https://example.com/helium")!,
-                target: .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
                 config: config
             )
             XCTFail("Expected open to throw")
         } catch {
             XCTAssertEqual(
                 error as? BrowserLauncherError,
-                .unsupportedFallbackBrowserHeliumProfile(bundleID: "com.apple.Safari")
+                .unsupportedDefaultBrowserHeliumProfile(bundleID: "com.apple.Safari")
             )
         }
     }
@@ -243,9 +243,9 @@ final class BrowserLauncherTests: XCTestCase {
 
     private func makeConfig() -> RouterConfig {
         RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
     }

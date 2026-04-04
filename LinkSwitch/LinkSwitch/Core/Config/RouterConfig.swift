@@ -1,6 +1,6 @@
 import Foundation
 
-enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
+enum DefaultBrowserRoute: Codable, Equatable, CustomStringConvertible {
     case plain
     case heliumProfile(profileDirectory: String)
     case firefoxProfile(profileKey: String)
@@ -19,38 +19,38 @@ enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
         }
     }
 
-    /// Maps a persisted fallback route to the `BrowserTarget` used for unmatched links.
+    /// Maps a persisted default-browser route to the `BrowserTarget` used for unmatched links.
     var browserTarget: BrowserTarget {
         switch self {
         case .plain:
-            return .fallbackBrowser
+            return .defaultBrowser
         case let .heliumProfile(profileDirectory):
-            return .fallbackBrowserHeliumProfile(profileDirectory: profileDirectory)
+            return .defaultBrowserHeliumProfile(profileDirectory: profileDirectory)
         case let .firefoxProfile(profileKey):
-            return .fallbackBrowserFirefoxProfile(profileKey: profileKey)
+            return .defaultBrowserFirefoxProfile(profileKey: profileKey)
         case let .zenContainer(containerName):
-            return .fallbackBrowserZenContainer(containerName: containerName)
+            return .defaultBrowserZenContainer(containerName: containerName)
         }
     }
 }
 
 enum BrowserTarget: Codable, Equatable, CustomStringConvertible {
-    case fallbackBrowser
-    case fallbackBrowserHeliumProfile(profileDirectory: String)
-    case fallbackBrowserFirefoxProfile(profileKey: String)
-    case fallbackBrowserZenContainer(containerName: String)
+    case defaultBrowser
+    case defaultBrowserHeliumProfile(profileDirectory: String)
+    case defaultBrowserFirefoxProfile(profileKey: String)
+    case defaultBrowserZenContainer(containerName: String)
     case helium(profileDirectory: String)
 
     var description: String {
         switch self {
-        case .fallbackBrowser:
-            return "fallbackBrowser"
-        case let .fallbackBrowserHeliumProfile(profileDirectory):
-            return "fallbackBrowserHeliumProfile(profileDirectory: \(profileDirectory))"
-        case let .fallbackBrowserFirefoxProfile(profileKey):
-            return "fallbackBrowserFirefoxProfile(profileKey: \(profileKey))"
-        case let .fallbackBrowserZenContainer(containerName):
-            return "fallbackBrowserZenContainer(containerName: \(containerName))"
+        case .defaultBrowser:
+            return "defaultBrowser"
+        case let .defaultBrowserHeliumProfile(profileDirectory):
+            return "defaultBrowserHeliumProfile(profileDirectory: \(profileDirectory))"
+        case let .defaultBrowserFirefoxProfile(profileKey):
+            return "defaultBrowserFirefoxProfile(profileKey: \(profileKey))"
+        case let .defaultBrowserZenContainer(containerName):
+            return "defaultBrowserZenContainer(containerName: \(containerName))"
         case let .helium(profileDirectory):
             return "helium(profileDirectory: \(profileDirectory))"
         }
@@ -64,44 +64,8 @@ struct SourceAppRule: Codable, Identifiable, Equatable {
 }
 
 struct RouterConfig: Codable, Equatable {
-    var fallbackBrowserBundleID: String
-    var fallbackBrowserAppURL: URL
-    var fallbackBrowserRoute: FallbackBrowserRoute
+    var defaultBrowserBundleID: String
+    var defaultBrowserAppURL: URL
+    var defaultBrowserRoute: DefaultBrowserRoute
     var rules: [SourceAppRule]
-
-    private enum CodingKeys: String, CodingKey {
-        case fallbackBrowserBundleID
-        case fallbackBrowserAppURL
-        case fallbackBrowserRoute
-        case rules
-    }
-
-    init(
-        fallbackBrowserBundleID: String,
-        fallbackBrowserAppURL: URL,
-        fallbackBrowserRoute: FallbackBrowserRoute,
-        rules: [SourceAppRule]
-    ) {
-        self.fallbackBrowserBundleID = fallbackBrowserBundleID
-        self.fallbackBrowserAppURL = fallbackBrowserAppURL
-        self.fallbackBrowserRoute = fallbackBrowserRoute
-        self.rules = rules
-    }
-
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        fallbackBrowserBundleID = try container.decode(String.self, forKey: .fallbackBrowserBundleID)
-        fallbackBrowserAppURL = try container.decode(URL.self, forKey: .fallbackBrowserAppURL)
-        rules = try container.decode([SourceAppRule].self, forKey: .rules)
-
-        if let fallbackBrowserRoute = try container.decodeIfPresent(FallbackBrowserRoute.self, forKey: .fallbackBrowserRoute) {
-            self.fallbackBrowserRoute = fallbackBrowserRoute
-        } else {
-            AppLogger.info(
-                "Router config missing fallbackBrowserRoute; loading existing config with plain fallback route",
-                category: .config
-            )
-            fallbackBrowserRoute = .plain
-        }
-    }
 }

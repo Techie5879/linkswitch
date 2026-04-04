@@ -101,7 +101,7 @@ final class PreferencesViewController: NSViewController {
         case error
     }
 
-    // Tags used in the fallback browser popup to distinguish item kinds.
+    // Tags used in the default browser popup to distinguish item kinds.
     private enum PopupItemTag: Int {
         /// A discovered browser: the tag value is its index in model.discoveredBrowsers.
         /// Discovered items use non-negative tags matching their index.
@@ -114,20 +114,20 @@ final class PreferencesViewController: NSViewController {
     private let model: PreferencesModel
     private let iconProvider = AppIconProvider()
 
-    // MARK: Fallback browser card controls
-    private let fallbackBrowserIconView: NSImageView = {
+    // MARK: Default browser card controls
+    private let defaultBrowserIconView: NSImageView = {
         let iv = NSImageView()
         iv.imageScaling = .scaleProportionallyDown
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    private let fallbackBrowserPopup = NSPopUpButton()
+    private let defaultBrowserPopup = DefaultBrowserAccessibilityPopUpButton()
 
-    private let fallbackProfileSectionLabel = NSTextField(labelWithString: "Profile")
-    private let fallbackProfileCardsStack = NSStackView()
-    private let fallbackProfileDiscoveryErrorLabel = NSTextField(labelWithString: "")
-    private let fallbackProfileContainerView = NSStackView()
-    private var fallbackBrowserDisplayedProfiles: [BrowserProfile] = []
+    private let defaultProfileSectionLabel = NSTextField(labelWithString: "Profile")
+    private let defaultProfileCardsStack = NSStackView()
+    private let defaultProfileDiscoveryErrorLabel = NSTextField(labelWithString: "")
+    private let defaultProfileContainerView = NSStackView()
+    private var defaultBrowserDisplayedProfiles: [BrowserProfile] = []
 
     // MARK: Handler status card controls
     private let handlerStatusImageView: NSImageView = {
@@ -146,10 +146,10 @@ final class PreferencesViewController: NSViewController {
         accessibilityIdentifier: "preferences.registerHandlerButton"
     )
 
-    private lazy var setFallbackAsDefaultHandlerButton: NSButton = makeButton(
-        title: "Set Fallback Browser as Default Handler",
-        action: #selector(setFallbackBrowserAsDefaultHandler(_:)),
-        accessibilityIdentifier: "preferences.setFallbackAsDefaultHandlerButton"
+    private lazy var setDefaultBrowserAsDefaultHandlerButton: NSButton = makeButton(
+        title: "Set Default Browser as HTTP/HTTPS Handler",
+        action: #selector(setDefaultBrowserAsDefaultHandler(_:)),
+        accessibilityIdentifier: "preferences.setDefaultBrowserAsDefaultHandlerButton"
     )
 
     private lazy var reloadButton: NSButton = makeButton(
@@ -305,10 +305,10 @@ final class PreferencesViewController: NSViewController {
     }
 
     private func makeTopCardsRow() -> NSStackView {
-        let fallbackCard = makeFallbackBrowserCard()
+        let defaultCard = makeDefaultBrowserCard()
         let handlerCard = makeHandlerStatusCard()
 
-        let row = NSStackView(views: [fallbackCard, handlerCard])
+        let row = NSStackView(views: [defaultCard, handlerCard])
         row.orientation = .horizontal
         row.distribution = .fillEqually
         row.alignment = .top
@@ -316,54 +316,53 @@ final class PreferencesViewController: NSViewController {
         return row
     }
 
-    // MARK: Fallback browser card
+    // MARK: Default browser card
 
-    private func makeFallbackBrowserCard() -> NSView {
+    private func makeDefaultBrowserCard() -> NSView {
         let card = CardView()
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        let titleLabel = makeSectionLabel("Fallback Browser")
+        let titleLabel = makeSectionLabel("Default Browser")
 
-        fallbackBrowserIconView.setContentHuggingPriority(.required, for: .horizontal)
-        fallbackBrowserIconView.setContentHuggingPriority(.required, for: .vertical)
-        fallbackBrowserIconView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        defaultBrowserIconView.setContentHuggingPriority(.required, for: .horizontal)
+        defaultBrowserIconView.setContentHuggingPriority(.required, for: .vertical)
+        defaultBrowserIconView.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        fallbackBrowserPopup.target = self
-        fallbackBrowserPopup.action = #selector(fallbackBrowserPopupChanged(_:))
-        fallbackBrowserPopup.setAccessibilityIdentifier("preferences.fallbackBrowserPopup")
+        defaultBrowserPopup.target = self
+        defaultBrowserPopup.action = #selector(defaultBrowserPopupChanged(_:))
 
         let testButton = makeButton(
             title: "Test",
-            action: #selector(testFallbackBrowser(_:)),
-            accessibilityIdentifier: "preferences.testFallbackBrowserButton"
+            action: #selector(testDefaultBrowser(_:)),
+            accessibilityIdentifier: "preferences.testDefaultBrowserButton"
         )
 
-        let actionsRow = NSStackView(views: [fallbackBrowserIconView, fallbackBrowserPopup, testButton])
+        let actionsRow = NSStackView(views: [defaultBrowserIconView, defaultBrowserPopup, testButton])
         actionsRow.orientation = .horizontal
         actionsRow.alignment = .centerY
         actionsRow.spacing = 8
 
-        fallbackProfileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-        fallbackProfileSectionLabel.textColor = .secondaryLabelColor
+        defaultProfileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        defaultProfileSectionLabel.textColor = .secondaryLabelColor
 
-        fallbackProfileCardsStack.orientation = .horizontal
-        fallbackProfileCardsStack.alignment = .centerY
-        fallbackProfileCardsStack.spacing = 8
-        fallbackProfileCardsStack.setAccessibilityIdentifier("preferences.fallbackBrowser.profileCardsStack")
+        defaultProfileCardsStack.orientation = .horizontal
+        defaultProfileCardsStack.alignment = .centerY
+        defaultProfileCardsStack.spacing = 8
+        defaultProfileCardsStack.setAccessibilityIdentifier("preferences.defaultBrowser.profileCardsStack")
 
-        fallbackProfileDiscoveryErrorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        fallbackProfileDiscoveryErrorLabel.textColor = .systemOrange
-        fallbackProfileDiscoveryErrorLabel.isHidden = true
+        defaultProfileDiscoveryErrorLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        defaultProfileDiscoveryErrorLabel.textColor = .systemOrange
+        defaultProfileDiscoveryErrorLabel.isHidden = true
 
-        fallbackProfileContainerView.orientation = .vertical
-        fallbackProfileContainerView.alignment = .leading
-        fallbackProfileContainerView.spacing = 6
-        fallbackProfileContainerView.addArrangedSubview(fallbackProfileSectionLabel)
-        fallbackProfileContainerView.addArrangedSubview(fallbackProfileCardsStack)
-        fallbackProfileContainerView.addArrangedSubview(fallbackProfileDiscoveryErrorLabel)
-        fallbackProfileContainerView.isHidden = true
+        defaultProfileContainerView.orientation = .vertical
+        defaultProfileContainerView.alignment = .leading
+        defaultProfileContainerView.spacing = 6
+        defaultProfileContainerView.addArrangedSubview(defaultProfileSectionLabel)
+        defaultProfileContainerView.addArrangedSubview(defaultProfileCardsStack)
+        defaultProfileContainerView.addArrangedSubview(defaultProfileDiscoveryErrorLabel)
+        defaultProfileContainerView.isHidden = true
 
-        let contentStack = NSStackView(views: [titleLabel, actionsRow, fallbackProfileContainerView])
+        let contentStack = NSStackView(views: [titleLabel, actionsRow, defaultProfileContainerView])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
@@ -371,14 +370,14 @@ final class PreferencesViewController: NSViewController {
 
         card.addSubview(contentStack)
         NSLayoutConstraint.activate([
-            fallbackBrowserIconView.widthAnchor.constraint(equalToConstant: 24),
-            fallbackBrowserIconView.heightAnchor.constraint(equalToConstant: 24),
+            defaultBrowserIconView.widthAnchor.constraint(equalToConstant: 24),
+            defaultBrowserIconView.heightAnchor.constraint(equalToConstant: 24),
             contentStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
             contentStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
             contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
             contentStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
-            fallbackBrowserPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
-            fallbackProfileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
+            defaultBrowserPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
+            defaultProfileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
         ])
 
         return card
@@ -409,7 +408,7 @@ final class PreferencesViewController: NSViewController {
         statusRow.alignment = .top
         statusRow.spacing = 12
 
-        let buttonsStack = NSStackView(views: [registerHandlerButton, setFallbackAsDefaultHandlerButton])
+        let buttonsStack = NSStackView(views: [registerHandlerButton, setDefaultBrowserAsDefaultHandlerButton])
         buttonsStack.orientation = .vertical
         buttonsStack.alignment = .leading
         buttonsStack.spacing = 8
@@ -565,9 +564,9 @@ final class PreferencesViewController: NSViewController {
         configPathLabel.stringValue = "Config file: \(model.configFileURLDescription)"
         sampleURLField.stringValue = model.sampleURLString
 
-        refreshFallbackBrowserDisplay()
-        refreshFallbackBrowserPopup()
-        refreshFallbackProfileBrowserSection()
+        refreshDefaultBrowserDisplay()
+        refreshDefaultBrowserPopup()
+        refreshDefaultProfileBrowserSection()
         refreshHandlerStatusDisplay()
 
         refreshRules()
@@ -647,11 +646,11 @@ final class PreferencesViewController: NSViewController {
             handlerPrimaryLabel.stringValue = "LinkSwitch is the default web browser"
             handlerSecondaryLabel.stringValue = "Handles http and https links."
             registerHandlerButton.isHidden = true
-            setFallbackAsDefaultHandlerButton.isHidden = false
-            let hasFallback = model.fallbackBrowserAppURL != nil && !model.fallbackBrowserBundleID.isEmpty
-            let fallbackAlreadyDefault =
-                (httpID == model.fallbackBrowserBundleID && httpsID == model.fallbackBrowserBundleID)
-            setFallbackAsDefaultHandlerButton.isEnabled = hasFallback && !fallbackAlreadyDefault
+            setDefaultBrowserAsDefaultHandlerButton.isHidden = false
+            let hasDefaultBrowser = model.defaultBrowserAppURL != nil && !model.defaultBrowserBundleID.isEmpty
+            let defaultBrowserAlreadyDefault =
+                (httpID == model.defaultBrowserBundleID && httpsID == model.defaultBrowserBundleID)
+            setDefaultBrowserAsDefaultHandlerButton.isEnabled = hasDefaultBrowser && !defaultBrowserAlreadyDefault
         } else {
             if let img = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil) {
                 handlerStatusImageView.image = img.withSymbolConfiguration(symbolConfig)
@@ -666,24 +665,24 @@ final class PreferencesViewController: NSViewController {
                     "Set LinkSwitch as the default handler to open links through LinkSwitch."
             }
             registerHandlerButton.isHidden = false
-            setFallbackAsDefaultHandlerButton.isHidden = true
+            setDefaultBrowserAsDefaultHandlerButton.isHidden = true
         }
     }
 
-    private func refreshFallbackBrowserDisplay() {
-        if let appURL = model.fallbackBrowserAppURL {
-            fallbackBrowserIconView.image = iconProvider.icon(forAppURL: appURL)
+    private func refreshDefaultBrowserDisplay() {
+        if let appURL = model.defaultBrowserAppURL {
+            defaultBrowserIconView.image = iconProvider.icon(forAppURL: appURL)
         } else {
-            fallbackBrowserIconView.image = NSImage(named: NSImage.applicationIconName)
+            defaultBrowserIconView.image = NSImage(named: NSImage.applicationIconName)
         }
     }
 
-    private func refreshFallbackBrowserPopup() {
-        fallbackBrowserPopup.removeAllItems()
+    private func refreshDefaultBrowserPopup() {
+        defaultBrowserPopup.removeAllItems()
 
         let discovered = model.discoveredBrowsers
-        let currentBundleID = model.fallbackBrowserBundleID
-        let currentAppURL = model.fallbackBrowserAppURL
+        let currentBundleID = model.defaultBrowserBundleID
+        let currentAppURL = model.defaultBrowserAppURL
         let isCurrentInDiscovered = discovered.contains { $0.bundleID == currentBundleID }
 
         // If the currently-configured browser is not in the discovered list, show it as a
@@ -698,62 +697,62 @@ final class PreferencesViewController: NSViewController {
                 name = appURL.deletingPathExtension().lastPathComponent
             }
             let item = makePopupMenuItem(title: "\(name) (custom)", icon: icon, tag: PopupItemTag.customCurrentBrowser.rawValue)
-            fallbackBrowserPopup.menu?.addItem(item)
-            fallbackBrowserPopup.menu?.addItem(.separator())
+            defaultBrowserPopup.menu?.addItem(item)
+            defaultBrowserPopup.menu?.addItem(.separator())
         }
 
         // Discovered browsers
         for (index, browser) in discovered.enumerated() {
             let icon = iconProvider.icon(forAppURL: browser.appURL)
             let item = makePopupMenuItem(title: browser.name, icon: icon, tag: index)
-            fallbackBrowserPopup.menu?.addItem(item)
+            defaultBrowserPopup.menu?.addItem(item)
         }
 
         // "Other…" to pick manually
-        fallbackBrowserPopup.menu?.addItem(.separator())
+        defaultBrowserPopup.menu?.addItem(.separator())
         let otherItem = NSMenuItem(title: "Other…", action: nil, keyEquivalent: "")
         otherItem.tag = PopupItemTag.otherBrowser.rawValue
-        fallbackBrowserPopup.menu?.addItem(otherItem)
+        defaultBrowserPopup.menu?.addItem(otherItem)
 
         // Select the current browser in the popup
         if isCurrentInDiscovered, let index = discovered.firstIndex(where: { $0.bundleID == currentBundleID }) {
-            fallbackBrowserPopup.selectItem(withTag: index)
+            defaultBrowserPopup.selectItem(withTag: index)
         } else if !currentBundleID.isEmpty {
-            fallbackBrowserPopup.selectItem(withTag: PopupItemTag.customCurrentBrowser.rawValue)
+            defaultBrowserPopup.selectItem(withTag: PopupItemTag.customCurrentBrowser.rawValue)
         }
     }
 
-    private func refreshFallbackProfileBrowserSection() {
-        let bundleID = model.fallbackBrowserBundleID
-        let mode = BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: bundleID)
-        fallbackProfileSectionLabel.stringValue = mode.sectionTitle
+    private func refreshDefaultProfileBrowserSection() {
+        let bundleID = model.defaultBrowserBundleID
+        let mode = BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: bundleID)
+        defaultProfileSectionLabel.stringValue = mode.sectionTitle
 
-        guard model.fallbackBrowserAppURL != nil, !bundleID.isEmpty, mode != .none else {
-            fallbackProfileContainerView.isHidden = true
-            fallbackBrowserDisplayedProfiles = []
-            clearFallbackProfileCards()
+        guard model.defaultBrowserAppURL != nil, !bundleID.isEmpty, mode != .none else {
+            defaultProfileContainerView.isHidden = true
+            defaultBrowserDisplayedProfiles = []
+            clearDefaultProfileCards()
             return
         }
 
-        fallbackProfileContainerView.isHidden = false
-        let result = BrowserProfileRoutePicker.loadProfileCards(mode: mode, fallbackBrowserBundleID: bundleID)
-        fallbackBrowserDisplayedProfiles = result.displayedProfiles
+        defaultProfileContainerView.isHidden = false
+        let result = BrowserProfileRoutePicker.loadProfileCards(mode: mode, defaultBrowserBundleID: bundleID)
+        defaultBrowserDisplayedProfiles = result.displayedProfiles
         if let errorMessage = result.errorMessage {
-            fallbackProfileDiscoveryErrorLabel.stringValue = errorMessage
-            fallbackProfileDiscoveryErrorLabel.isHidden = false
+            defaultProfileDiscoveryErrorLabel.stringValue = errorMessage
+            defaultProfileDiscoveryErrorLabel.isHidden = false
         } else {
-            fallbackProfileDiscoveryErrorLabel.isHidden = true
+            defaultProfileDiscoveryErrorLabel.isHidden = true
         }
 
-        rebuildFallbackProfileCards()
+        rebuildDefaultProfileCards()
         AppLogger.info(
-            "Default fallback browser profile section (\(result.logContext)): \(fallbackBrowserDisplayedProfiles.count) card(s), selected key '\(currentFallbackRouteSelectionKey())'",
+            "Default browser profile section (\(result.logContext)): \(defaultBrowserDisplayedProfiles.count) card(s), selected key '\(currentDefaultRouteSelectionKey())'",
             category: .app
         )
     }
 
-    private func currentFallbackRouteSelectionKey() -> String {
-        switch model.fallbackBrowserRoute {
+    private func currentDefaultRouteSelectionKey() -> String {
+        switch model.defaultBrowserRoute {
         case .plain:
             return ""
         case let .heliumProfile(profileDirectory):
@@ -765,55 +764,55 @@ final class PreferencesViewController: NSViewController {
         }
     }
 
-    private func rebuildFallbackProfileCards() {
-        clearFallbackProfileCards()
-        for (index, profile) in fallbackBrowserDisplayedProfiles.enumerated() {
+    private func rebuildDefaultProfileCards() {
+        clearDefaultProfileCards()
+        for (index, profile) in defaultBrowserDisplayedProfiles.enumerated() {
             let button = ProfileCardButton(title: profile.displayName)
             button.tag = index
             button.target = self
-            button.action = #selector(fallbackProfileCardSelected(_:))
-            button.setAccessibilityIdentifier("preferences.fallbackBrowser.profileCard.\(index)")
-            fallbackProfileCardsStack.addArrangedSubview(button)
+            button.action = #selector(defaultProfileCardSelected(_:))
+            button.setAccessibilityIdentifier("preferences.defaultBrowser.profileCard.\(index)")
+            defaultProfileCardsStack.addArrangedSubview(button)
         }
-        applyFallbackProfileCardSelection()
+        applyDefaultProfileCardSelection()
     }
 
-    private func clearFallbackProfileCards() {
-        fallbackProfileCardsStack.arrangedSubviews.forEach { view in
-            fallbackProfileCardsStack.removeArrangedSubview(view)
+    private func clearDefaultProfileCards() {
+        defaultProfileCardsStack.arrangedSubviews.forEach { view in
+            defaultProfileCardsStack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
     }
 
-    private func applyFallbackProfileCardSelection() {
-        let key = currentFallbackRouteSelectionKey()
-        for (index, view) in fallbackProfileCardsStack.arrangedSubviews.enumerated() {
-            guard let button = view as? ProfileCardButton, fallbackBrowserDisplayedProfiles.indices.contains(index) else { continue }
-            button.isSelectedCard = fallbackBrowserDisplayedProfiles[index].profileKey == key
+    private func applyDefaultProfileCardSelection() {
+        let key = currentDefaultRouteSelectionKey()
+        for (index, view) in defaultProfileCardsStack.arrangedSubviews.enumerated() {
+            guard let button = view as? ProfileCardButton, defaultBrowserDisplayedProfiles.indices.contains(index) else { continue }
+            button.isSelectedCard = defaultBrowserDisplayedProfiles[index].profileKey == key
         }
     }
 
-    @objc private func fallbackProfileCardSelected(_ sender: NSButton) {
-        guard fallbackBrowserDisplayedProfiles.indices.contains(sender.tag) else { return }
-        let profile = fallbackBrowserDisplayedProfiles[sender.tag]
-        let mode = BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: model.fallbackBrowserBundleID)
-        let route: FallbackBrowserRoute
+    @objc private func defaultProfileCardSelected(_ sender: NSButton) {
+        guard defaultBrowserDisplayedProfiles.indices.contains(sender.tag) else { return }
+        let profile = defaultBrowserDisplayedProfiles[sender.tag]
+        let mode = BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: model.defaultBrowserBundleID)
+        let route: DefaultBrowserRoute
         switch mode {
-        case .fallbackHeliumProfile:
+        case .defaultHeliumProfile:
             route = profile.profileKey.isEmpty ? .plain : .heliumProfile(profileDirectory: profile.profileKey)
-        case .fallbackFirefoxProfile:
+        case .defaultFirefoxProfile:
             route = profile.profileKey.isEmpty ? .plain : .firefoxProfile(profileKey: profile.profileKey)
-        case .fallbackZenContainer:
+        case .defaultZenContainer:
             route = profile.profileKey.isEmpty ? .plain : .zenContainer(containerName: profile.profileKey)
         case .none, .heliumProfile:
             return
         }
-        model.updateFallbackBrowserRoute(route)
-        applyFallbackProfileCardSelection()
+        model.updateDefaultBrowserRoute(route)
+        applyDefaultProfileCardSelection()
         refreshRawConfigPreview()
         scheduleAutoSave()
         AppLogger.info(
-            "Default fallback browser: selected card \(profile.displayName) key '\(profile.profileKey)' route \(route.description)",
+            "Default browser: selected card \(profile.displayName) key '\(profile.profileKey)' route \(route.description)",
             category: .app
         )
     }
@@ -837,8 +836,8 @@ final class PreferencesViewController: NSViewController {
                 draft: draft,
                 discoveredApplications: model.discoveredApplications,
                 iconProvider: iconProvider,
-                fallbackBrowserBundleID: model.fallbackBrowserBundleID,
-                fallbackBrowserAppURL: model.fallbackBrowserAppURL,
+                defaultBrowserBundleID: model.defaultBrowserBundleID,
+                defaultBrowserAppURL: model.defaultBrowserAppURL,
                 onSourceBundleIDChange: { [weak self] value in
                     self?.model.updateRuleSourceBundleID(id: draft.id, value: value)
                     self?.refreshRawConfigPreview()
@@ -852,8 +851,8 @@ final class PreferencesViewController: NSViewController {
                     self?.refreshUI()
                     self?.scheduleAutoSave()
                 },
-                onFallbackBrowserRouteChange: { [weak self] route in
-                    self?.model.updateRuleFallbackBrowserRoute(id: draft.id, route: route)
+                onDefaultBrowserRouteChange: { [weak self] route in
+                    self?.model.updateRuleDefaultBrowserRoute(id: draft.id, route: route)
                     self?.refreshRawConfigPreview()
                     self?.scheduleAutoSave()
                 },
@@ -879,26 +878,26 @@ final class PreferencesViewController: NSViewController {
 
     // MARK: Actions
 
-    @objc private func fallbackBrowserPopupChanged(_ sender: Any?) {
-        guard let tag = fallbackBrowserPopup.selectedItem?.tag else { return }
+    @objc private func defaultBrowserPopupChanged(_ sender: Any?) {
+        guard let tag = defaultBrowserPopup.selectedItem?.tag else { return }
 
         if tag == PopupItemTag.otherBrowser.rawValue {
             // Reset the popup to the previously selected item before opening the panel,
             // so the display doesn't jump to "Other…" while the panel is open.
-            refreshFallbackBrowserPopup()
-            chooseFallbackBrowserFromPanel()
+            refreshDefaultBrowserPopup()
+            chooseDefaultBrowserFromPanel()
         } else if tag == PopupItemTag.customCurrentBrowser.rawValue {
             // Already current; nothing to do.
         } else if tag >= 0 && tag < model.discoveredBrowsers.count {
             let browser = model.discoveredBrowsers[tag]
-            AppLogger.info("Fallback browser changed to \(browser.bundleID) via popup", category: .app)
-            model.setFallbackBrowser(discoveredBrowser: browser)
+            AppLogger.info("Default browser changed to \(browser.bundleID) via popup", category: .app)
+            model.setDefaultBrowser(discoveredBrowser: browser)
             refreshUI()
             scheduleAutoSave()
         }
     }
 
-    private func chooseFallbackBrowserFromPanel() {
+    private func chooseDefaultBrowserFromPanel() {
         guard let hostWindow = view.window else {
             AppLogger.error("Preferences browser picker requested without a host window", category: .app)
             return
@@ -909,12 +908,12 @@ final class PreferencesViewController: NSViewController {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.message = "Choose the fallback browser app."
+        panel.message = "Choose the default browser app."
 
         panel.beginSheetModal(for: hostWindow) { [weak self] response in
             guard response == .OK, let applicationURL = panel.url else { return }
             do {
-                try self?.model.setFallbackBrowser(applicationURL: applicationURL)
+                try self?.model.setDefaultBrowser(applicationURL: applicationURL)
                 self?.refreshUI()
                 self?.scheduleAutoSave()
             } catch {
@@ -955,14 +954,14 @@ final class PreferencesViewController: NSViewController {
         }
     }
 
-    @objc private func testFallbackBrowser(_ sender: Any?) {
+    @objc private func testDefaultBrowser(_ sender: Any?) {
         syncSampleURLField()
         Task { @MainActor [weak self] in
             do {
-                try await self?.model.testFallbackBrowser()
-                self?.setStatus("Opened the sample URL in the fallback browser.")
+                try await self?.model.testDefaultBrowser()
+                self?.setStatus("Opened the sample URL in the default browser.")
             } catch {
-                self?.presentPreferencesError(error, message: "Could not test the fallback browser launch.")
+                self?.presentPreferencesError(error, message: "Could not test the default browser launch.")
             }
         }
     }
@@ -1003,18 +1002,18 @@ final class PreferencesViewController: NSViewController {
         }
     }
 
-    @objc private func setFallbackBrowserAsDefaultHandler(_ sender: Any?) {
-        AppLogger.info("User requested setting fallback browser as default http/https handler", category: .app)
+    @objc private func setDefaultBrowserAsDefaultHandler(_ sender: Any?) {
+        AppLogger.info("User requested setting the default browser as the macOS http/https handler", category: .app)
         Task { @MainActor [weak self] in
             do {
-                let result = try await self?.model.registerFallbackBrowserAsDefaultHandler()
+                let result = try await self?.model.registerDefaultBrowserAsDefaultHandler()
                 self?.refreshUI()
                 switch result {
                 case .registered:
-                    self?.setStatus("Set the fallback browser as the default handler for http and https.")
+                    self?.setStatus("Set the default browser as the HTTP/HTTPS handler.")
                 case .alreadyRegistered:
                     self?.setStatus(
-                        "The fallback browser is already the default handler for http and https.",
+                        "The default browser is already the HTTP/HTTPS handler.",
                         style: .warning
                     )
                 case nil:
@@ -1023,7 +1022,7 @@ final class PreferencesViewController: NSViewController {
             } catch {
                 self?.presentPreferencesError(
                     error,
-                    message: "Could not set the fallback browser as the default handler."
+                    message: "Could not set the default browser as the HTTP/HTTPS handler."
                 )
             }
         }
@@ -1126,13 +1125,13 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private let draft: PreferencesRuleDraft
     private let discoveredApplications: [DiscoveredApplication]
     private let iconProvider: AppIconProvider
-    private let fallbackBrowserBundleID: String
-    private var fallbackBrowserAppURL: URL?
+    private let defaultBrowserBundleID: String
+    private var defaultBrowserAppURL: URL?
 
     private let onSourceBundleIDChange: (String) -> Void
     private let onSourcePickerNeedsUIRefresh: () -> Void
     private let onTargetKindChange: (PreferencesRuleTargetKind) -> Void
-    private let onFallbackBrowserRouteChange: (FallbackBrowserRoute) -> Void
+    private let onDefaultBrowserRouteChange: (DefaultBrowserRoute) -> Void
     private let onHeliumProfileDirectoryChange: (String) -> Void
     private let onRemove: () -> Void
     private let onTest: () -> Void
@@ -1145,12 +1144,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         draft: PreferencesRuleDraft,
         discoveredApplications: [DiscoveredApplication],
         iconProvider: AppIconProvider,
-        fallbackBrowserBundleID: String,
-        fallbackBrowserAppURL: URL?,
+        defaultBrowserBundleID: String,
+        defaultBrowserAppURL: URL?,
         onSourceBundleIDChange: @escaping (String) -> Void,
         onSourcePickerNeedsUIRefresh: @escaping () -> Void,
         onTargetKindChange: @escaping (PreferencesRuleTargetKind) -> Void,
-        onFallbackBrowserRouteChange: @escaping (FallbackBrowserRoute) -> Void,
+        onDefaultBrowserRouteChange: @escaping (DefaultBrowserRoute) -> Void,
         onHeliumProfileDirectoryChange: @escaping (String) -> Void,
         onRemove: @escaping () -> Void,
         onTest: @escaping () -> Void
@@ -1158,20 +1157,20 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         self.draft = draft
         self.discoveredApplications = discoveredApplications
         self.iconProvider = iconProvider
-        self.fallbackBrowserBundleID = fallbackBrowserBundleID
-        self.fallbackBrowserAppURL = fallbackBrowserAppURL
+        self.defaultBrowserBundleID = defaultBrowserBundleID
+        self.defaultBrowserAppURL = defaultBrowserAppURL
         self.onSourceBundleIDChange = onSourceBundleIDChange
         self.onSourcePickerNeedsUIRefresh = onSourcePickerNeedsUIRefresh
         self.onTargetKindChange = onTargetKindChange
-        self.onFallbackBrowserRouteChange = onFallbackBrowserRouteChange
+        self.onDefaultBrowserRouteChange = onDefaultBrowserRouteChange
         self.onHeliumProfileDirectoryChange = onHeliumProfileDirectoryChange
         self.onRemove = onRemove
         self.onTest = onTest
 
         lastAppliedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
         switch draft.targetKind {
-        case .fallbackBrowser:
-            switch draft.fallbackBrowserRoute {
+        case .defaultBrowser:
+            switch draft.defaultBrowserRoute {
             case .plain:
                 currentSelectionKey = ""
             case let .heliumProfile(profileDirectory):
@@ -1325,7 +1324,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         arrowLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         targetKindPopupButton.addItems(withTitles: PreferencesRuleTargetKind.allCases.map(\.displayName))
-        targetKindPopupButton.selectItem(at: draft.targetKind == .fallbackBrowser ? 0 : 1)
+        targetKindPopupButton.selectItem(at: draft.targetKind == .defaultBrowser ? 0 : 1)
         targetKindPopupButton.target = self
         targetKindPopupButton.action = #selector(targetKindChanged(_:))
         targetKindPopupButton.setAccessibilityIdentifier("preferences.rule.targetKindPopup")
@@ -1419,8 +1418,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
     private func updateTargetIcon(targetKind: PreferencesRuleTargetKind) {
         switch targetKind {
-        case .fallbackBrowser:
-            if let appURL = fallbackBrowserAppURL {
+        case .defaultBrowser:
+            if let appURL = defaultBrowserAppURL {
                 targetIconView.image = iconProvider.icon(forAppURL: appURL)
             } else {
                 targetIconView.image = NSImage(named: NSImage.applicationIconName)
@@ -1437,8 +1436,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             let kind = kinds[index]
             let icon: NSImage
             switch kind {
-            case .fallbackBrowser:
-                if let appURL = fallbackBrowserAppURL {
+            case .defaultBrowser:
+                if let appURL = defaultBrowserAppURL {
                     icon = iconProvider.icon(forAppURL: appURL)
                 } else {
                     icon = NSImage(named: NSImage.applicationIconName) ?? NSImage()
@@ -1453,13 +1452,13 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     }
 
     private func selectedTargetKind() -> PreferencesRuleTargetKind {
-        targetKindPopupButton.indexOfSelectedItem == 0 ? .fallbackBrowser : .helium
+        targetKindPopupButton.indexOfSelectedItem == 0 ? .defaultBrowser : .helium
     }
 
     private func profileRouteSelectionMode() -> BrowserProfileRouteSelectionMode {
         BrowserProfileRouteSelectionMode.mode(
             targetKind: selectedTargetKind(),
-            fallbackBrowserBundleID: fallbackBrowserBundleID
+            defaultBrowserBundleID: defaultBrowserBundleID
         )
     }
 
@@ -1578,21 +1577,21 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         switch profileRouteSelectionMode() {
         case .heliumProfile:
             onHeliumProfileDirectoryChange(profile.profileKey)
-        case .fallbackHeliumProfile:
-            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+        case .defaultHeliumProfile:
+            let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .heliumProfile(profileDirectory: profile.profileKey)
-            onFallbackBrowserRouteChange(route)
-        case .fallbackFirefoxProfile:
-            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+            onDefaultBrowserRouteChange(route)
+        case .defaultFirefoxProfile:
+            let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .firefoxProfile(profileKey: profile.profileKey)
-            onFallbackBrowserRouteChange(route)
-        case .fallbackZenContainer:
-            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+            onDefaultBrowserRouteChange(route)
+        case .defaultZenContainer:
+            let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .zenContainer(containerName: profile.profileKey)
-            onFallbackBrowserRouteChange(route)
+            onDefaultBrowserRouteChange(route)
         case .none:
             return
         }
@@ -1609,7 +1608,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
         let result = BrowserProfileRoutePicker.loadProfileCards(
             mode: mode,
-            fallbackBrowserBundleID: fallbackBrowserBundleID
+            defaultBrowserBundleID: defaultBrowserBundleID
         )
         discoveredProfiles = result.displayedProfiles
         if let errorMessage = result.errorMessage {
@@ -1662,12 +1661,28 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     }
 }
 
+private final class DefaultBrowserAccessibilityPopUpButton: NSPopUpButton {
+    convenience init() {
+        self.init(frame: .zero, pullsDown: false)
+    }
+
+    override init(frame buttonFrame: NSRect, pullsDown flag: Bool) {
+        super.init(frame: buttonFrame, pullsDown: flag)
+        setAccessibilityIdentifier("preferences.defaultBrowserPopup")
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setAccessibilityIdentifier("preferences.defaultBrowserPopup")
+    }
+}
+
 // MARK: - PreferencesRuleTargetKind display names
 
 private extension PreferencesRuleTargetKind {
     var displayName: String {
         switch self {
-        case .fallbackBrowser: return "Fallback Browser"
+        case .defaultBrowser: return "Default Browser"
         case .helium: return "Helium"
         }
     }

@@ -13,8 +13,8 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             configFileURLDescription: configFileURL.path()
         )
 
-        preferencesModel.fallbackBrowserBundleID = "com.apple.Safari"
-        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        preferencesModel.defaultBrowserBundleID = "com.apple.Safari"
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
         let ruleID = preferencesModel.addRule()
         preferencesModel.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
         preferencesModel.updateRuleTargetKind(id: ruleID, targetKind: .helium)
@@ -40,9 +40,9 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                     url: URL(string: "https://example.com/work")!,
                     target: .helium(profileDirectory: "Profile 1"),
                     config: RouterConfig(
-                        fallbackBrowserBundleID: "com.apple.Safari",
-                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-                        fallbackBrowserRoute: .plain,
+                        defaultBrowserBundleID: "com.apple.Safari",
+                        defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        defaultBrowserRoute: .plain,
                         rules: [
                             SourceAppRule(
                                 id: ruleID,
@@ -67,8 +67,8 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             configFileURLDescription: configFileURL.path()
         )
 
-        preferencesModel.fallbackBrowserBundleID = "com.apple.Safari"
-        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        preferencesModel.defaultBrowserBundleID = "com.apple.Safari"
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
 
         let slackRuleID = preferencesModel.addRule()
         preferencesModel.updateRuleSourceBundleID(id: slackRuleID, value: "com.tinyspeck.slackmacgap")
@@ -99,9 +99,9 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
         )
 
         let savedConfig = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: slackRuleID,
@@ -134,7 +134,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
     }
 
     @MainActor
-    func testSavedPreferencesConfigRoutesUnknownSourceToFallbackBrowser() async throws {
+    func testSavedPreferencesConfigRoutesUnknownSourceToDefaultBrowser() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
         let configStore = RouterConfigStore(configFileURL: configFileURL)
@@ -144,8 +144,8 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             configFileURLDescription: configFileURL.path()
         )
 
-        preferencesModel.fallbackBrowserBundleID = "com.apple.Safari"
-        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        preferencesModel.defaultBrowserBundleID = "com.apple.Safari"
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
         try preferencesModel.save()
 
         let browserLauncher = RoutingPipelineBrowserLauncherSpy()
@@ -156,7 +156,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
         )
 
         try await intakeController.handle(
-            urls: [URL(string: "https://example.com/fallback")!],
+            urls: [URL(string: "https://example.com/default-browser")!],
             sourceBundleID: "com.apple.mail"
         )
 
@@ -164,12 +164,12 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             browserLauncher.openCalls,
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
-                    url: URL(string: "https://example.com/fallback")!,
-                    target: .fallbackBrowser,
+                    url: URL(string: "https://example.com/default-browser")!,
+                    target: .defaultBrowser,
                     config: RouterConfig(
-                        fallbackBrowserBundleID: "com.apple.Safari",
-                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-                        fallbackBrowserRoute: .plain,
+                        defaultBrowserBundleID: "com.apple.Safari",
+                        defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        defaultBrowserRoute: .plain,
                         rules: []
                     )
                 ),
@@ -178,7 +178,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
     }
 
     @MainActor
-    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredFallbackFirefoxProfile() async throws {
+    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredDefaultBrowserFirefoxProfile() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
         let configStore = RouterConfigStore(configFileURL: configFileURL)
@@ -188,9 +188,9 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             configFileURLDescription: configFileURL.path()
         )
 
-        preferencesModel.fallbackBrowserBundleID = "org.mozilla.firefox"
-        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Firefox.app")
-        preferencesModel.updateFallbackBrowserRoute(.firefoxProfile(profileKey: "Profiles/work.default"))
+        preferencesModel.defaultBrowserBundleID = "org.mozilla.firefox"
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Firefox.app")
+        preferencesModel.updateDefaultBrowserRoute(.firefoxProfile(profileKey: "Profiles/work.default"))
         try preferencesModel.save()
 
         let browserLauncher = RoutingPipelineBrowserLauncherSpy()
@@ -201,7 +201,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
         )
 
         try await intakeController.handle(
-            urls: [URL(string: "https://example.com/fallback")!],
+            urls: [URL(string: "https://example.com/default-browser")!],
             sourceBundleID: "com.apple.mail"
         )
 
@@ -209,12 +209,12 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             browserLauncher.openCalls,
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
-                    url: URL(string: "https://example.com/fallback")!,
-                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
+                    url: URL(string: "https://example.com/default-browser")!,
+                    target: .defaultBrowserFirefoxProfile(profileKey: "Profiles/work.default"),
                     config: RouterConfig(
-                        fallbackBrowserBundleID: "org.mozilla.firefox",
-                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
-                        fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
+                        defaultBrowserBundleID: "org.mozilla.firefox",
+                        defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+                        defaultBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
                         rules: []
                     )
                 ),
@@ -223,7 +223,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
     }
 
     @MainActor
-    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredFallbackHeliumProfile() async throws {
+    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredDefaultBrowserHeliumProfile() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
         let configStore = RouterConfigStore(configFileURL: configFileURL)
@@ -233,9 +233,9 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             configFileURLDescription: configFileURL.path()
         )
 
-        preferencesModel.fallbackBrowserBundleID = BrowserLauncher.heliumBundleID
-        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Helium.app")
-        preferencesModel.updateFallbackBrowserRoute(.heliumProfile(profileDirectory: "Profile 1"))
+        preferencesModel.defaultBrowserBundleID = BrowserLauncher.heliumBundleID
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Helium.app")
+        preferencesModel.updateDefaultBrowserRoute(.heliumProfile(profileDirectory: "Profile 1"))
         try preferencesModel.save()
 
         let browserLauncher = RoutingPipelineBrowserLauncherSpy()
@@ -246,7 +246,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
         )
 
         try await intakeController.handle(
-            urls: [URL(string: "https://example.com/fallback-helium")!],
+            urls: [URL(string: "https://example.com/default-browser-helium")!],
             sourceBundleID: "com.apple.mail"
         )
 
@@ -254,12 +254,12 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             browserLauncher.openCalls,
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
-                    url: URL(string: "https://example.com/fallback-helium")!,
-                    target: .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                    url: URL(string: "https://example.com/default-browser-helium")!,
+                    target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
                     config: RouterConfig(
-                        fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
-                        fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-                        fallbackBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+                        defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
+                        defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                        defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
                         rules: []
                     )
                 ),

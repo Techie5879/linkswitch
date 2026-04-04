@@ -98,7 +98,7 @@ Current development choice:
 Reason:
 
 - The next planned milestone after the pure-core model is to bridge real macOS app resolution and browser launching without taking on URL-handler registration or sender-resolution work yet.
-- The launch layer needs a test seam around `NSWorkspace` so fallback-browser forwarding and Helium-specific profile launching can be verified without launching real apps during unit tests.
+- The launch layer needs a test seam around `NSWorkspace` so default-browser forwarding and Helium-specific profile launching can be verified without launching real apps during unit tests.
 
 Implemented in:
 
@@ -110,7 +110,7 @@ Implemented in:
 Current shape:
 
 - `LaunchServicesBridge` resolves the current handler bundle ID for a URL scheme, resolves installed app URLs by bundle ID, and wraps default-handler registration for URL schemes.
-- `BrowserLauncher` forwards fallback-browser opens through `NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`.
+- `BrowserLauncher` forwards default-browser opens through `NSWorkspace.open(_:withApplicationAt:configuration:completionHandler:)`.
 - Helium launching stays browser-specific and uses `NSWorkspace.openApplication(at:configuration:completionHandler:)` with the generated Chromium-style profile arguments.
 - The launch layer logs important inputs, resolved app paths, launch arguments, and registration failures, and those log lines are visible in `logs/runtime.log` during tests.
 
@@ -132,13 +132,13 @@ Current shape:
 - `URLIntakeController` loads the saved router config, creates `IncomingOpenContext` values, runs each URL through `RuleEngine`, and delegates the actual open to `BrowserLauncher`.
 - `AppDelegate.application(_:open:)` now logs incoming AppKit URL opens and routes them through `URLIntakeController`.
 - That initial intake slice was built with `sourceBundleID = nil`; the later Apple Event sender-resolution slice now fills that value before async intake begins.
-- Missing config is surfaced as an explicit intake error and logged, which keeps the current no-fallback rule intact.
+- Missing config is surfaced as an explicit intake error and logged, which keeps the current no-implicit-recovery rule intact.
 
 ### Add the Apple Event sender-resolution slice
 
 Reason:
 
-- The core behavior depends on real sender metadata so source-app rules can differentiate `Slack -> Helium` from normal fallback forwarding.
+- The core behavior depends on real sender metadata so source-app rules can differentiate `Slack -> Helium` from normal default-browser forwarding.
 - `NSApplicationDelegate.application(_:open:)` does not expose a sender directly, so the app must resolve sender metadata from the current Apple Event before the async intake task starts.
 
 Implemented in:
@@ -152,13 +152,13 @@ Current shape:
 
 - `SourceAppResolver` reads the current Apple Event, extracts `keySenderPIDAttr`, maps that PID to `NSRunningApplication`, and returns an optional bundle ID.
 - `AppDelegate.application(_:open:)` now resolves the sender synchronously before it enters the async intake pipeline, which avoids losing Apple Event metadata after the stack unwinds.
-- Missing sender metadata stays explicit and logged; the routing layer still treats `sourceBundleID` as optional and falls back only through the configured fallback-browser rule path.
+- Missing sender metadata stays explicit and logged; the routing layer still treats `sourceBundleID` as optional and falls back only through the configured default-browser rule path.
 
 ### Add a preferences and registration slice
 
 Reason:
 
-- The app now needs an actual operator-facing surface to choose the fallback browser, manage source-app rules, test launches, and request default-handler registration without editing config files by hand.
+- The app now needs an actual operator-facing surface to choose the default browser, manage source-app rules, test launches, and request default-handler registration without editing config files by hand.
 - URL-handler registration also needs real bundle URL declarations for `http` and `https` so Launch Services can recognize LinkSwitch as a web handler.
 
 Implemented in:
@@ -175,10 +175,10 @@ Implemented in:
 Current shape:
 
 - The app menu Preferences item is wired programmatically.
-- The preferences UI is code-built in `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift` and supports fallback-browser selection, source-app rule CRUD, sample-URL test launches, current `http` / `https` handler inspection, and a button that calls `LaunchServicesBridge` to request LinkSwitch as the default web handler.
+- The preferences UI is code-built in `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift` and supports default-browser selection, source-app rule CRUD, sample-URL test launches, current `http` / `https` handler inspection, and a button that calls `LaunchServicesBridge` to request LinkSwitch as the default web handler.
 - The source-app rule editor keeps the target-browser column anchored in one place and renders discovered Helium profiles as separate selectable cards instead of a single segmented control.
-- Fallback-browser rules and the **default** fallback path now keep the plain browser open as `Browser Default`, surface Firefox-family `profiles.ini` profiles when the configured fallback browser is Firefox-family, and surface Zen container identities when the configured fallback browser is Zen.
-- Fallback Firefox-profile launches use the browser executable with Firefox-style `-new-instance -profile <absolute path>` arguments, while fallback Zen-container launches use the extension-based `ext+container:` handoff documented in `docs/zen-fallback-research.md`.
+- Default-browser rules and the **default** route now keep the plain browser open as a synthetic plain-route card (`No Profile` or `No Container` depending on mode), surface Firefox-family `profiles.ini` profiles when the configured default browser is Firefox-family, and surface Zen container identities when the configured default browser is Zen.
+- Default-browser Firefox-profile launches use the browser executable with Firefox-style `-new-instance -profile <absolute path>` arguments, while default-browser Zen-container launches use the extension-based `ext+container:` handoff documented in `docs/zen-default-browser-research.md`.
 - `PreferencesModel` is the testable logic layer behind that UI and owns config loading, validation, persistence, test launches, and default-handler registration requests.
 - The app bundle now declares `http` and `https` in `CFBundleURLTypes`, and a host-bundle test verifies those schemes are present.
 - The newer app-shell migration keeps that preferences surface intact, but normal launch now starts from the menu bar status item and hides the main window by default.
@@ -220,11 +220,11 @@ Current shape:
 - The integration tests save config through `PreferencesModel`, reload that same file through a real `RouterConfigStore`, and drive `URLIntakeController` with spy launchers.
 - The current automated coverage now exercises the persistence -> intake -> rule engine -> launch selection path without mutating the machine's real browser defaults during test runs.
 
-### Investigate Zen fallback-browser profile discovery
+### Investigate Zen default-browser profile discovery
 
 Reason:
 
-- The fallback-browser rule UI currently exposes Helium profiles only.
+- The default-browser rule UI currently exposes Helium profiles only.
 - Zen was expected to show `personal` and `work`, but the local install did not expose those names through the normal Firefox-style profile registry.
 
 Current findings:
@@ -234,35 +234,35 @@ Current findings:
 - The active Zen profile reports `hasSelectableProfiles: false`, so the newer Gecko selectable-profile storage is not what is producing `personal/work` here.
 - Public research found no documented first-party Zen command-line or URL API for opening an external link in a specific workspace or container.
 - The only documented external container handoff found was the extension-based `ext+container:` flow, which is not a stable built-in contract and was not installed locally.
-- The detailed research notes live in `docs/zen-fallback-research.md`.
+- The detailed research notes live in `docs/zen-default-browser-research.md`.
 
 Implemented direction:
 
-- Firefox-family fallback browsers now use `profiles.ini`-backed profile cards and executable launches with explicit Firefox-style profile arguments.
-- Zen fallback browsers now use `containers.json`-backed container cards and the extension-based `ext+container:` handoff.
-- Fallback-browser changes normalize incompatible saved rule selections back to the plain browser path instead of keeping hidden stale Firefox/Zen-specific targets.
+- Firefox-family default browsers now use `profiles.ini`-backed profile cards and executable launches with explicit Firefox-style profile arguments.
+- Zen default browsers now use `containers.json`-backed container cards and the extension-based `ext+container:` handoff.
+- Default-browser changes normalize incompatible saved rule selections back to the plain browser path instead of keeping hidden stale Firefox/Zen-specific targets.
 
-### Default fallback browser route (shared with rule engine)
+### Default browser route (shared with rule engine)
 
 Reason:
 
-- Unmatched links and nil-sender opens used to always target plain `BrowserTarget.fallbackBrowser` while per-rule fallback targets could use Firefox profiles or Zen containers. The configured fallback browser should drive the same routing for the default path as for explicit rules.
+- Unmatched links and nil-sender opens used to always target plain `BrowserTarget.defaultBrowser` while per-rule default-browser targets could use Firefox profiles or Zen containers. The configured default browser should drive the same routing for the default path as for explicit rules.
 
 Implemented in:
 
-- `LinkSwitch/LinkSwitch/Core/Config/RouterConfig.swift` (`fallbackBrowserRoute`, `FallbackBrowserRoute.browserTarget`)
+- `LinkSwitch/LinkSwitch/Core/Config/RouterConfig.swift` (`defaultBrowserRoute`, `DefaultBrowserRoute.browserTarget`)
 - `LinkSwitch/LinkSwitch/Core/Routing/RuleEngine.swift`
 - `LinkSwitch/LinkSwitch/UI/PreferencesModel.swift`
 - `LinkSwitch/LinkSwitch/UI/BrowserProfileRoutePicker.swift`
-- `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift` (fallback browser card profile/container cards)
+- `LinkSwitch/LinkSwitch/UI/PreferencesWindowController.swift` (default browser card profile/container cards)
 - Tests under `LinkSwitch/LinkSwitchTests/`
 
 Current shape:
 
-- `RouterConfig` stores `fallbackBrowserRoute`; `RuleEngine` maps no-match / nil-sender to `config.fallbackBrowserRoute.browserTarget`.
-- Preferences include profile/container cards on the fallback browser card when the selected browser supports them; discovery is shared via `BrowserProfileRoutePicker` with source-app rule rows.
-- Helium now uses the same fallback-browser profile capability path as the fallback-browser rule rows: selecting Helium as the fallback browser surfaces Helium profile cards plus `Browser Default`, persists `FallbackBrowserRoute.heliumProfile(profileDirectory:)`, and routes unmatched links through the configured Helium profile.
-- `RouterConfig` decoding treats a missing `fallbackBrowserRoute` key from an older saved config as `.plain`, so persisted configs from before this field existed still load and get rewritten in the new shape after the next save.
+- `RouterConfig` stores `defaultBrowserRoute`; `RuleEngine` maps no-match / nil-sender to `config.defaultBrowserRoute.browserTarget`.
+- Preferences include profile/container cards on the default browser card when the selected browser supports them; discovery is shared via `BrowserProfileRoutePicker` with source-app rule rows.
+- Helium now uses the same default-browser profile capability path as the default-browser rule rows: selecting Helium as the default browser surfaces Helium profile cards plus `No Profile`, persists `DefaultBrowserRoute.heliumProfile(profileDirectory:)`, and routes unmatched links through the configured Helium profile.
+- `RouterConfig` JSON requires `defaultBrowserRoute`; configs without that key fail decoding so the on-disk shape stays explicit.
 
 ## Source references
 

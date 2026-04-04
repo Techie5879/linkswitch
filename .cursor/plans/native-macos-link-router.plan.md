@@ -1,12 +1,12 @@
 ---
 name: native-macos-link-router
-overview: Build a small AppKit macOS URL-handler app that routes links by source app, forwards most links to a user-chosen fallback browser, and supports a Helium Chromium-profile override for work links.
+overview: Build a small AppKit macOS URL-handler app that routes links by source app, forwards most links to a user-chosen default browser, and supports a Helium Chromium-profile override for work links.
 todos:
   - id: bootstrap-appkit-app
     content: Use the existing Xcode-generated macOS AppKit target as the base, then add Info.plist URL-scheme declarations for http/https and a minimal preferences window.
     status: completed
   - id: define-config-model
-    content: Define the scoped config model for fallback browser selection and source-app override rules, persisted as JSON or plist.
+    content: Define the scoped config model for default browser selection and source-app override rules, persisted as JSON or plist.
     status: completed
   - id: launch-services-bridge
     content: Wrap Launch Services and NSWorkspace APIs for reading the current handler, setting the app as the handler, and resolving browser app URLs.
@@ -25,20 +25,20 @@ todos:
     dependencies:
       - url-intake-pipeline
   - id: browser-launch-adapters
-    content: Implement browser launch adapters for fallback-browser forwarding and Helium Chromium-profile forwarding.
+    content: Implement browser launch adapters for default-browser forwarding and Helium Chromium-profile forwarding.
     status: completed
     dependencies:
       - launch-services-bridge
       - url-intake-pipeline
   - id: rule-engine
-    content: Implement the scoped rule engine for source-app bundle ID matching and fallback forwarding.
+    content: Implement the scoped rule engine for source-app bundle ID matching and default-browser forwarding.
     status: completed
     dependencies:
       - define-config-model
       - source-app-resolution-spike
       - browser-launch-adapters
   - id: preferences-ui
-    content: Build the AppKit preferences UI to choose the fallback browser, define source-app rules, and test launches.
+    content: Build the AppKit preferences UI to choose the default browser, define source-app rules, and test launches.
     status: completed
     dependencies:
       - define-config-model
@@ -50,7 +50,7 @@ todos:
     dependencies:
       - rule-engine
   - id: manual-e2e-verification
-    content: Run manual end-to-end verification with Slack-like sender flows and confirm fallback-browser behavior for non-matching apps.
+    content: Run manual end-to-end verification with Slack-like sender flows and confirm default-browser behavior for non-matching apps.
     status: pending
     dependencies:
       - preferences-ui
@@ -64,19 +64,19 @@ isProject: true
 
 - Build a small native `AppKit` macOS app that becomes the `http` and `https` handler.
 - Route by source app bundle ID only; the first real rule is `Slack -> Helium work profile`.
-- Forward all non-matching links to a user-chosen fallback browser, which is intended to be the user's normal browser.
+- Forward all non-matching links to a user-chosen default browser, which is intended to be the user's normal browser.
 - Keep the project intentionally narrow: no URL/domain routing, no chooser UI, no Firefox/Zen profile support, no Safari profile support.
 
 ## Final product
 
 - A lightweight native macOS app with:
   - a minimal preferences window
-  - a stored fallback browser target
+  - a stored default browser target
   - a small list of source-app override rules
   - a Helium adapter that can launch a specific Chromium profile for work links
 - Typical behavior:
   - `Slack` opens links in `Helium` with the configured work profile
-  - everything else opens in the configured fallback browser
+  - everything else opens in the configured default browser
 
 ## Source-of-truth paths and assumptions
 
@@ -96,7 +96,7 @@ isProject: true
 - Shared router/config types should live in one place inside `Core/Config/` and be imported elsewhere as needed; do not redefine the same types or interfaces near feature code.
 - Keep nesting shallow. Add folders only when they buy clarity in Xcode and in the target, not to mirror an abstract architecture diagram.
 - Persist user config under the app container or Application Support as a small JSON/plist file.
-- Store the fallback browser explicitly; do not rely on asking Launch Services for the default browser after this app becomes the handler.
+- Store the default browser explicitly; do not rely on asking Launch Services for the system default browser after this app becomes the handler.
 
 ## Research-backed macOS APIs to use
 
@@ -128,8 +128,9 @@ isProject: true
 
 ```swift
 struct RouterConfig: Codable {
-    var fallbackBrowserBundleID: String
-    var fallbackBrowserAppURL: URL
+    var defaultBrowserBundleID: String
+    var defaultBrowserAppURL: URL
+    var defaultBrowserRoute: DefaultBrowserRoute
     var rules: [SourceAppRule]
 }
 
@@ -140,7 +141,10 @@ struct SourceAppRule: Codable, Identifiable {
 }
 
 enum BrowserTarget: Codable {
-    case fallbackBrowser
+    case defaultBrowser
+    case defaultBrowserHeliumProfile(profileDirectory: String)
+    case defaultBrowserFirefoxProfile(profileKey: String)
+    case defaultBrowserZenContainer(containerName: String)
     case helium(profileDirectory: String)
 }
 
@@ -168,7 +172,7 @@ Incoming URL
 -> map sender to bundle ID
 -> first matching source-app rule wins
 -> if match is Helium, launch Helium with configured Chromium profile
--> otherwise forward to stored fallback browser
+-> otherwise forward to stored default browser
 ```
 
 ## Known pitfalls to design around
@@ -177,7 +181,7 @@ Incoming URL
 - The app must become the URL handler; that is the native extension point on macOS.
 - Sender detection is the highest-risk area and needs an explicit spike before committing to the full implementation.
 - Browser profiles are not an OS concept; Helium profile support is app-specific and may need process-launch arguments.
-- Once the router app becomes the default handler, Launch Services will report this app as the handler, so the original fallback browser must already be saved in config.
+- Once the router app becomes the default handler, Launch Services will report this app as the handler, so the original default browser must already be saved in config.
 
 ## Module design
 
@@ -201,7 +205,7 @@ Incoming URL
   - `HeliumLauncher`
 - `UI/`
   - `PreferencesWindowController`
-  - small AppKit views/controllers for fallback browser selection, rule CRUD, and test launches
+  - small AppKit views/controllers for default browser selection, rule CRUD, and test launches
 - `Support/`
   - narrow helpers only when needed; do not turn this into a dumping ground
 
@@ -219,20 +223,20 @@ Incoming URL
 - Integration tests:
   - run the router against a test-only scheme like `linkroutertest://` to avoid mutating the machine's real browser defaults during CI/local automation
   - verify `SenderHarness.app -> router -> CaptureBrowser.app` flow
-  - verify non-matching senders route to the configured fallback browser target
+  - verify non-matching senders route to the configured default browser target
 - Manual verification:
   - set the router as the real `http/https` handler
-  - configure fallback browser to the user's normal browser
+  - configure the default browser to the user's normal browser
   - add `Slack -> Helium(work-profile)`
   - click a Slack link and confirm Helium opens the right profile
-  - click a link from another app and confirm fallback-browser forwarding
+  - click a link from another app and confirm default-browser forwarding
 
 ## Deliverables
 
 - Native AppKit app target in `LinkSwitch/LinkSwitch.xcodeproj`
 - Config model and source-app rule engine
 - Helium work-profile launcher adapter
-- Preferences UI for fallback browser and source-app rules
+- Preferences UI for default browser and source-app rules
 - Automated fixture-based routing tests
 - Short implementation notes documenting sender-detection findings and any unsupported edge cases
 

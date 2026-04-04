@@ -34,7 +34,7 @@ Implementation files:
 
 - It aligns with the plan's single routing pipeline and explicit sender-detection spike.
 - It matches Apple's Apple Event handling model for URL events.
-- It does not invent fallback heuristics when sender data is unavailable.
+- It does not invent extra heuristics when sender data is unavailable.
 
 ## Known limits
 
@@ -46,7 +46,7 @@ Implementation files:
 ## What this means for LinkSwitch
 
 - `IncomingOpenContext.sourceBundleID` must stay optional.
-- Rule matching should cleanly fall back to the configured fallback browser when the sender cannot be resolved.
+- Rule matching should cleanly fall back to the configured default browser when the sender cannot be resolved.
 - Unsupported or missing sender metadata should be documented, not guessed around.
 
 ## References

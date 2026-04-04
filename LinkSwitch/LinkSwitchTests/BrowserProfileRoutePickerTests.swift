@@ -2,28 +2,38 @@ import XCTest
 @testable import LinkSwitch
 
 final class BrowserProfileRoutePickerTests: XCTestCase {
-    func testFallbackBrowserModeUsesFallbackHeliumProfileForHeliumBundleID() {
+    func testDefaultBrowserModeUsesDefaultHeliumProfileForHeliumBundleID() {
         XCTAssertEqual(
-            BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: BrowserLauncher.heliumBundleID),
-            .fallbackHeliumProfile
+            BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: BrowserLauncher.heliumBundleID),
+            .defaultHeliumProfile
         )
     }
 
-    func testFallbackBrowserRuleModeUsesFallbackHeliumProfileWhenFallbackBrowserIsHelium() {
+    func testDefaultBrowserRuleModeUsesDefaultHeliumProfileWhenDefaultBrowserIsHelium() {
         XCTAssertEqual(
             BrowserProfileRouteSelectionMode.mode(
-                targetKind: .fallbackBrowser,
-                fallbackBrowserBundleID: BrowserLauncher.heliumBundleID
+                targetKind: .defaultBrowser,
+                defaultBrowserBundleID: BrowserLauncher.heliumBundleID
             ),
-            .fallbackHeliumProfile
+            .defaultHeliumProfile
         )
     }
 
-    func testFallbackHeliumProfileModeIncludesBrowserDefaultCard() {
-        XCTAssertTrue(BrowserProfileRouteSelectionMode.fallbackHeliumProfile.includesBrowserDefaultCard)
+    func testDefaultHeliumProfileModeIncludesBrowserDefaultCard() {
+        XCTAssertTrue(BrowserProfileRouteSelectionMode.defaultHeliumProfile.includesBrowserDefaultCard)
     }
 
-    func testDirectHeliumRuleModeDoesNotIncludeBrowserDefaultCard() {
-        XCTAssertFalse(BrowserProfileRouteSelectionMode.heliumProfile.includesBrowserDefaultCard)
+    func testDefaultZenContainerModeUsesNoContainerPlainRouteCardLabel() {
+        XCTAssertEqual(
+            BrowserProfileRouteSelectionMode.browserDefaultCard(for: .defaultZenContainer).displayName,
+            "No Container"
+        )
+    }
+
+    func testDefaultFirefoxProfileModeUsesNoProfilePlainRouteCardLabel() {
+        XCTAssertEqual(
+            BrowserProfileRouteSelectionMode.browserDefaultCard(for: .defaultFirefoxProfile).displayName,
+            "No Profile"
+        )
     }
 }

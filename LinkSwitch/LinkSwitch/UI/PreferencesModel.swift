@@ -5,7 +5,7 @@ protocol RouterConfigSaving {
 }
 
 enum PreferencesRuleTargetKind: String, CaseIterable, Equatable {
-    case fallbackBrowser
+    case defaultBrowser
     case helium
 }
 
@@ -13,33 +13,33 @@ struct PreferencesRuleDraft: Equatable {
     let id: UUID
     var sourceBundleID: String
     var targetKind: PreferencesRuleTargetKind
-    var fallbackBrowserRoute: FallbackBrowserRoute
+    var defaultBrowserRoute: DefaultBrowserRoute
     var heliumProfileDirectory: String
 }
 
 enum PreferencesModelError: Error, Equatable {
-    case missingFallbackBrowserSelection
-    case fallbackBrowserBundleIdentifierNotFound(applicationURL: URL)
+    case missingDefaultBrowserSelection
+    case defaultBrowserBundleIdentifierNotFound(applicationURL: URL)
     case linkSwitchBundleIdentifierNotFound(applicationURL: URL)
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
-    case emptyFallbackBrowserHeliumProfile(UUID)
-    case emptyFallbackBrowserFirefoxProfile(UUID)
-    case emptyFallbackBrowserZenContainer(UUID)
-    case emptyFallbackBrowserDefaultHeliumProfile
-    case emptyFallbackBrowserDefaultFirefoxProfile
-    case emptyFallbackBrowserDefaultZenContainer
+    case emptyDefaultBrowserHeliumProfile(UUID)
+    case emptyDefaultBrowserFirefoxProfile(UUID)
+    case emptyDefaultBrowserZenContainer(UUID)
+    case emptyDefaultBrowserRouteHeliumProfile
+    case emptyDefaultBrowserRouteFirefoxProfile
+    case emptyDefaultBrowserRouteZenContainer
     case emptyHeliumProfileDirectory(UUID)
 }
 
 extension PreferencesModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingFallbackBrowserSelection:
-            return "Select a fallback browser before saving."
-        case let .fallbackBrowserBundleIdentifierNotFound(applicationURL):
-            return "The selected fallback browser at \(applicationURL.path()) does not expose a bundle identifier."
+        case .missingDefaultBrowserSelection:
+            return "Select a default browser before saving."
+        case let .defaultBrowserBundleIdentifierNotFound(applicationURL):
+            return "The selected default browser at \(applicationURL.path()) does not expose a bundle identifier."
         case let .linkSwitchBundleIdentifierNotFound(applicationURL):
             return "The LinkSwitch app at \(applicationURL.path()) does not expose a bundle identifier."
         case let .invalidSampleURL(urlString):
@@ -48,18 +48,18 @@ extension PreferencesModelError: LocalizedError {
             return "The selected rule \(ruleID.uuidString) no longer exists."
         case let .emptySourceBundleID(ruleID):
             return "Rule \(ruleID.uuidString) is missing a source app bundle ID."
-        case let .emptyFallbackBrowserHeliumProfile(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a fallback Helium profile."
-        case let .emptyFallbackBrowserFirefoxProfile(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a fallback Firefox profile."
-        case let .emptyFallbackBrowserZenContainer(ruleID):
+        case let .emptyDefaultBrowserHeliumProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a default browser Helium profile."
+        case let .emptyDefaultBrowserFirefoxProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a default browser Firefox profile."
+        case let .emptyDefaultBrowserZenContainer(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Zen container."
-        case .emptyFallbackBrowserDefaultHeliumProfile:
-            return "The default fallback browser route is missing a Helium profile."
-        case .emptyFallbackBrowserDefaultFirefoxProfile:
-            return "The default fallback browser route is missing a Firefox profile."
-        case .emptyFallbackBrowserDefaultZenContainer:
-            return "The default fallback browser route is missing a Zen container."
+        case .emptyDefaultBrowserRouteHeliumProfile:
+            return "The default browser route is missing a Helium profile."
+        case .emptyDefaultBrowserRouteFirefoxProfile:
+            return "The default browser route is missing a Firefox profile."
+        case .emptyDefaultBrowserRouteZenContainer:
+            return "The default browser route is missing a Zen container."
         case let .emptyHeliumProfileDirectory(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Helium profile."
         }
@@ -75,9 +75,9 @@ final class PreferencesModel {
     private let installedApplicationDiscovery: any InstalledApplicationDiscovering
 
     let configFileURLDescription: String
-    var fallbackBrowserBundleID = ""
-    var fallbackBrowserAppURL: URL?
-    var fallbackBrowserRoute: FallbackBrowserRoute = .plain
+    var defaultBrowserBundleID = ""
+    var defaultBrowserAppURL: URL?
+    var defaultBrowserRoute: DefaultBrowserRoute = .plain
     var sampleURLString = "https://example.com"
     private(set) var ruleDrafts: [PreferencesRuleDraft] = []
     private(set) var discoveredBrowsers: [DiscoveredBrowser] = []
@@ -115,48 +115,48 @@ final class PreferencesModel {
         refreshInstalledApplications()
         guard let config = try configStore.load() else {
             AppLogger.info("No router config exists yet; preferences model will start empty", category: .config)
-            fallbackBrowserBundleID = ""
-            fallbackBrowserAppURL = nil
-            fallbackBrowserRoute = .plain
+            defaultBrowserBundleID = ""
+            defaultBrowserAppURL = nil
+            defaultBrowserRoute = .plain
             ruleDrafts = []
             return
         }
 
-        fallbackBrowserBundleID = config.fallbackBrowserBundleID
-        fallbackBrowserAppURL = config.fallbackBrowserAppURL
-        fallbackBrowserRoute = config.fallbackBrowserRoute
+        defaultBrowserBundleID = config.defaultBrowserBundleID
+        defaultBrowserAppURL = config.defaultBrowserAppURL
+        defaultBrowserRoute = config.defaultBrowserRoute
         ruleDrafts = config.rules.map { rule in
             switch rule.target {
-            case .fallbackBrowser:
+            case .defaultBrowser:
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .fallbackBrowser,
-                    fallbackBrowserRoute: .plain,
+                    targetKind: .defaultBrowser,
+                    defaultBrowserRoute: .plain,
                     heliumProfileDirectory: ""
                 )
-            case let .fallbackBrowserHeliumProfile(profileDirectory):
+            case let .defaultBrowserHeliumProfile(profileDirectory):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .fallbackBrowser,
-                    fallbackBrowserRoute: .heliumProfile(profileDirectory: profileDirectory),
+                    targetKind: .defaultBrowser,
+                    defaultBrowserRoute: .heliumProfile(profileDirectory: profileDirectory),
                     heliumProfileDirectory: ""
                 )
-            case let .fallbackBrowserFirefoxProfile(profileKey):
+            case let .defaultBrowserFirefoxProfile(profileKey):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .fallbackBrowser,
-                    fallbackBrowserRoute: .firefoxProfile(profileKey: profileKey),
+                    targetKind: .defaultBrowser,
+                    defaultBrowserRoute: .firefoxProfile(profileKey: profileKey),
                     heliumProfileDirectory: ""
                 )
-            case let .fallbackBrowserZenContainer(containerName):
+            case let .defaultBrowserZenContainer(containerName):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .fallbackBrowser,
-                    fallbackBrowserRoute: .zenContainer(containerName: containerName),
+                    targetKind: .defaultBrowser,
+                    defaultBrowserRoute: .zenContainer(containerName: containerName),
                     heliumProfileDirectory: ""
                 )
             case let .helium(profileDirectory):
@@ -164,12 +164,12 @@ final class PreferencesModel {
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
                     targetKind: .helium,
-                    fallbackBrowserRoute: .plain,
+                    defaultBrowserRoute: .plain,
                     heliumProfileDirectory: profileDirectory
                 )
             }
         }
-        normalizeFallbackRuleTargetsForCurrentBrowser()
+        normalizeDefaultBrowserRuleTargetsForCurrentBrowser()
     }
 
     func refreshDiscoveredBrowsers() {
@@ -190,26 +190,26 @@ final class PreferencesModel {
         )
     }
 
-    func setFallbackBrowser(discoveredBrowser: DiscoveredBrowser) {
+    func setDefaultBrowser(discoveredBrowser: DiscoveredBrowser) {
         AppLogger.info(
-            "Setting fallback browser from discovered browser \(discoveredBrowser.bundleID) at \(discoveredBrowser.appURL.path())",
+            "Setting default browser from discovered browser \(discoveredBrowser.bundleID) at \(discoveredBrowser.appURL.path())",
             category: .config
         )
-        fallbackBrowserBundleID = discoveredBrowser.bundleID
-        fallbackBrowserAppURL = discoveredBrowser.appURL
-        normalizeFallbackRuleTargetsForCurrentBrowser()
+        defaultBrowserBundleID = discoveredBrowser.bundleID
+        defaultBrowserAppURL = discoveredBrowser.appURL
+        normalizeDefaultBrowserRuleTargetsForCurrentBrowser()
     }
 
-    func setFallbackBrowser(applicationURL: URL) throws {
-        AppLogger.info("Setting fallback browser from selected app \(applicationURL.path())", category: .config)
+    func setDefaultBrowser(applicationURL: URL) throws {
+        AppLogger.info("Setting default browser from selected app \(applicationURL.path())", category: .config)
         guard let bundleID = Bundle(url: applicationURL)?.bundleIdentifier else {
-            AppLogger.error("Selected fallback browser app did not expose a bundle ID: \(applicationURL.path())", category: .config)
-            throw PreferencesModelError.fallbackBrowserBundleIdentifierNotFound(applicationURL: applicationURL)
+            AppLogger.error("Selected default browser app did not expose a bundle ID: \(applicationURL.path())", category: .config)
+            throw PreferencesModelError.defaultBrowserBundleIdentifierNotFound(applicationURL: applicationURL)
         }
 
-        fallbackBrowserBundleID = bundleID
-        fallbackBrowserAppURL = applicationURL
-        normalizeFallbackRuleTargetsForCurrentBrowser()
+        defaultBrowserBundleID = bundleID
+        defaultBrowserAppURL = applicationURL
+        normalizeDefaultBrowserRuleTargetsForCurrentBrowser()
     }
 
     @discardableResult
@@ -219,8 +219,8 @@ final class PreferencesModel {
             PreferencesRuleDraft(
                 id: ruleID,
                 sourceBundleID: "",
-                targetKind: .fallbackBrowser,
-                fallbackBrowserRoute: .plain,
+                targetKind: .defaultBrowser,
+                defaultBrowserRoute: .plain,
                 heliumProfileDirectory: ""
             )
         )
@@ -240,21 +240,21 @@ final class PreferencesModel {
     func updateRuleTargetKind(id: UUID, targetKind: PreferencesRuleTargetKind) {
         updateRule(id: id) { draft in
             draft.targetKind = targetKind
-            if targetKind == .fallbackBrowser {
+            if targetKind == .defaultBrowser {
                 draft.heliumProfileDirectory = ""
             } else {
-                draft.fallbackBrowserRoute = .plain
+                draft.defaultBrowserRoute = .plain
             }
         }
     }
 
-    func updateRuleFallbackBrowserRoute(id: UUID, route: FallbackBrowserRoute) {
-        updateRule(id: id) { $0.fallbackBrowserRoute = route }
+    func updateRuleDefaultBrowserRoute(id: UUID, route: DefaultBrowserRoute) {
+        updateRule(id: id) { $0.defaultBrowserRoute = route }
     }
 
-    func updateFallbackBrowserRoute(_ route: FallbackBrowserRoute) {
-        fallbackBrowserRoute = route
-        AppLogger.info("Updated default fallback browser route to \(route.description)", category: .config)
+    func updateDefaultBrowserRoute(_ route: DefaultBrowserRoute) {
+        defaultBrowserRoute = route
+        AppLogger.info("Updated default browser route to \(route.description)", category: .config)
     }
 
     func updateRuleHeliumProfileDirectory(id: UUID, value: String) {
@@ -288,12 +288,12 @@ final class PreferencesModel {
         }
     }
 
-    func testFallbackBrowser() async throws {
+    func testDefaultBrowser() async throws {
         let config = try makeRouterConfig()
         let sampleURL = try makeSampleURL()
-        let target = config.fallbackBrowserRoute.browserTarget
+        let target = config.defaultBrowserRoute.browserTarget
         AppLogger.info(
-            "Testing fallback browser launch with URL \(sampleURL.absoluteString) and target \(target.description)",
+            "Testing default browser launch with URL \(sampleURL.absoluteString) and target \(target.description)",
             category: .launch
         )
         try await browserLauncher.open(sampleURL, target: target, config: config)
@@ -335,21 +335,21 @@ final class PreferencesModel {
         )
     }
 
-    /// Sets the configured fallback browser as the system default handler for `http` and `https`.
-    func registerFallbackBrowserAsDefaultHandler() async throws -> DefaultHandlerRegistrationResult {
-        AppLogger.info("Registering fallback browser as the default handler for http/https from preferences", category: .launch)
-        guard let applicationURL = fallbackBrowserAppURL else {
-            AppLogger.error("Cannot register fallback browser as default handler without a selected fallback app", category: .launch)
-            throw PreferencesModelError.missingFallbackBrowserSelection
+    /// Sets the configured default browser as the system default handler for `http` and `https`.
+    func registerDefaultBrowserAsDefaultHandler() async throws -> DefaultHandlerRegistrationResult {
+        AppLogger.info("Registering default browser as the default handler for http/https from preferences", category: .launch)
+        guard let applicationURL = defaultBrowserAppURL else {
+            AppLogger.error("Cannot register default browser as default handler without a selected app", category: .launch)
+            throw PreferencesModelError.missingDefaultBrowserSelection
         }
-        guard !fallbackBrowserBundleID.isEmpty else {
-            AppLogger.error("Cannot register fallback browser as default handler without a bundle identifier", category: .launch)
-            throw PreferencesModelError.missingFallbackBrowserSelection
+        guard !defaultBrowserBundleID.isEmpty else {
+            AppLogger.error("Cannot register default browser as default handler without a bundle identifier", category: .launch)
+            throw PreferencesModelError.missingDefaultBrowserSelection
         }
 
         return try await launchServicesBridge.setDefaultHandler(
             applicationURL: applicationURL,
-            applicationBundleIdentifier: fallbackBrowserBundleID,
+            applicationBundleIdentifier: defaultBrowserBundleID,
             urlSchemes: ["http", "https"]
         )
     }
@@ -364,12 +364,12 @@ final class PreferencesModel {
     }
 
     private func makeRouterConfig() throws -> RouterConfig {
-        guard let fallbackBrowserAppURL else {
-            AppLogger.error("Preferences model cannot build config without a fallback browser selection", category: .config)
-            throw PreferencesModelError.missingFallbackBrowserSelection
+        guard let defaultBrowserAppURL else {
+            AppLogger.error("Preferences model cannot build config without a default browser selection", category: .config)
+            throw PreferencesModelError.missingDefaultBrowserSelection
         }
 
-        let validatedFallbackRoute = try validatedFallbackBrowserRouteForSave(fallbackBrowserRoute)
+        let validatedDefaultRoute = try validatedDefaultBrowserRouteForSave(defaultBrowserRoute)
 
         let rules = try ruleDrafts.map { draft in
             let trimmedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -386,36 +386,36 @@ final class PreferencesModel {
         }
 
         return RouterConfig(
-            fallbackBrowserBundleID: fallbackBrowserBundleID,
-            fallbackBrowserAppURL: fallbackBrowserAppURL,
-            fallbackBrowserRoute: validatedFallbackRoute,
+            defaultBrowserBundleID: defaultBrowserBundleID,
+            defaultBrowserAppURL: defaultBrowserAppURL,
+            defaultBrowserRoute: validatedDefaultRoute,
             rules: rules
         )
     }
 
-    private func validatedFallbackBrowserRouteForSave(_ route: FallbackBrowserRoute) throws -> FallbackBrowserRoute {
+    private func validatedDefaultBrowserRouteForSave(_ route: DefaultBrowserRoute) throws -> DefaultBrowserRoute {
         switch route {
         case .plain:
             return .plain
         case let .heliumProfile(profileDirectory):
             let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedProfileDirectory.isEmpty else {
-                AppLogger.error("Default fallback browser route had an empty Helium profile directory", category: .config)
-                throw PreferencesModelError.emptyFallbackBrowserDefaultHeliumProfile
+                AppLogger.error("Default browser route had an empty Helium profile directory", category: .config)
+                throw PreferencesModelError.emptyDefaultBrowserRouteHeliumProfile
             }
             return .heliumProfile(profileDirectory: trimmedProfileDirectory)
         case let .firefoxProfile(profileKey):
             let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedProfileKey.isEmpty else {
-                AppLogger.error("Default fallback browser route had an empty Firefox profile key", category: .config)
-                throw PreferencesModelError.emptyFallbackBrowserDefaultFirefoxProfile
+                AppLogger.error("Default browser route had an empty Firefox profile key", category: .config)
+                throw PreferencesModelError.emptyDefaultBrowserRouteFirefoxProfile
             }
             return .firefoxProfile(profileKey: trimmedProfileKey)
         case let .zenContainer(containerName):
             let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedContainerName.isEmpty else {
-                AppLogger.error("Default fallback browser route had an empty Zen container name", category: .config)
-                throw PreferencesModelError.emptyFallbackBrowserDefaultZenContainer
+                AppLogger.error("Default browser route had an empty Zen container name", category: .config)
+                throw PreferencesModelError.emptyDefaultBrowserRouteZenContainer
             }
             return .zenContainer(containerName: trimmedContainerName)
         }
@@ -423,31 +423,31 @@ final class PreferencesModel {
 
     private func makeTarget(for draft: PreferencesRuleDraft) throws -> BrowserTarget {
         switch draft.targetKind {
-        case .fallbackBrowser:
-            switch draft.fallbackBrowserRoute {
+        case .defaultBrowser:
+            switch draft.defaultBrowserRoute {
             case .plain:
-                return .fallbackBrowser
+                return .defaultBrowser
             case let .heliumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty fallback Helium profile directory", category: .config)
-                    throw PreferencesModelError.emptyFallbackBrowserHeliumProfile(draft.id)
+                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Helium profile directory", category: .config)
+                    throw PreferencesModelError.emptyDefaultBrowserHeliumProfile(draft.id)
                 }
-                return .fallbackBrowserHeliumProfile(profileDirectory: trimmedProfileDirectory)
+                return .defaultBrowserHeliumProfile(profileDirectory: trimmedProfileDirectory)
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty fallback Firefox profile key", category: .config)
-                    throw PreferencesModelError.emptyFallbackBrowserFirefoxProfile(draft.id)
+                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Firefox profile key", category: .config)
+                    throw PreferencesModelError.emptyDefaultBrowserFirefoxProfile(draft.id)
                 }
-                return .fallbackBrowserFirefoxProfile(profileKey: trimmedProfileKey)
+                return .defaultBrowserFirefoxProfile(profileKey: trimmedProfileKey)
             case let .zenContainer(containerName):
                 let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedContainerName.isEmpty else {
                     AppLogger.error("Preferences rule \(draft.id) had an empty Zen container name", category: .config)
-                    throw PreferencesModelError.emptyFallbackBrowserZenContainer(draft.id)
+                    throw PreferencesModelError.emptyDefaultBrowserZenContainer(draft.id)
                 }
-                return .fallbackBrowserZenContainer(containerName: trimmedContainerName)
+                return .defaultBrowserZenContainer(containerName: trimmedContainerName)
             }
         case .helium:
             let trimmedProfileDirectory = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -459,41 +459,41 @@ final class PreferencesModel {
         }
     }
 
-    private func normalizeFallbackRuleTargetsForCurrentBrowser() {
-        let selectedBundleID = fallbackBrowserBundleID
-        let compatibility = fallbackBrowserCompatibility(forBundleID: selectedBundleID)
+    private func normalizeDefaultBrowserRuleTargetsForCurrentBrowser() {
+        let selectedBundleID = defaultBrowserBundleID
+        let compatibility = defaultBrowserCompatibility(forBundleID: selectedBundleID)
 
-        let defaultCurrent = fallbackBrowserRoute
-        let defaultNormalized = normalizedFallbackRoute(defaultCurrent, compatibility: compatibility)
+        let defaultCurrent = defaultBrowserRoute
+        let defaultNormalized = normalizedDefaultRoute(defaultCurrent, compatibility: compatibility)
         if defaultNormalized != defaultCurrent {
             AppLogger.info(
-                "Normalizing default fallback route from \(defaultCurrent.description) to \(defaultNormalized.description) for fallback browser \(selectedBundleID)",
+                "Normalizing default browser route from \(defaultCurrent.description) to \(defaultNormalized.description) for default browser \(selectedBundleID)",
                 category: .config
             )
-            fallbackBrowserRoute = defaultNormalized
+            defaultBrowserRoute = defaultNormalized
         }
 
-        for index in ruleDrafts.indices where ruleDrafts[index].targetKind == .fallbackBrowser {
-            let currentRoute = ruleDrafts[index].fallbackBrowserRoute
-            let normalizedRoute = normalizedFallbackRoute(currentRoute, compatibility: compatibility)
+        for index in ruleDrafts.indices where ruleDrafts[index].targetKind == .defaultBrowser {
+            let currentRoute = ruleDrafts[index].defaultBrowserRoute
+            let normalizedRoute = normalizedDefaultRoute(currentRoute, compatibility: compatibility)
             if normalizedRoute != currentRoute {
                 AppLogger.info(
-                    "Normalizing fallback rule \(ruleDrafts[index].id) from \(currentRoute.description) to \(normalizedRoute.description) for fallback browser \(selectedBundleID)",
+                    "Normalizing default-browser rule \(ruleDrafts[index].id) from \(currentRoute.description) to \(normalizedRoute.description) for default browser \(selectedBundleID)",
                     category: .config
                 )
-                ruleDrafts[index].fallbackBrowserRoute = normalizedRoute
+                ruleDrafts[index].defaultBrowserRoute = normalizedRoute
             }
         }
     }
 
-    private func fallbackBrowserCompatibility(forBundleID bundleID: String) -> FallbackBrowserProfileSupport {
-        FallbackBrowserProfileSupport.forBundleID(bundleID)
+    private func defaultBrowserCompatibility(forBundleID bundleID: String) -> DefaultBrowserProfileSupport {
+        DefaultBrowserProfileSupport.forBundleID(bundleID)
     }
 
-    private func normalizedFallbackRoute(
-        _ route: FallbackBrowserRoute,
-        compatibility: FallbackBrowserProfileSupport
-    ) -> FallbackBrowserRoute {
+    private func normalizedDefaultRoute(
+        _ route: DefaultBrowserRoute,
+        compatibility: DefaultBrowserProfileSupport
+    ) -> DefaultBrowserRoute {
         switch compatibility {
         case .plainOnly:
             return .plain

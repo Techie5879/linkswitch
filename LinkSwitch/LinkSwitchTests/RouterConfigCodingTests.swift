@@ -2,11 +2,11 @@ import XCTest
 @testable import LinkSwitch
 
 final class RouterConfigCodingTests: XCTestCase {
-    func testRoundTripPreservesFallbackAndRules() throws {
+    func testRoundTripPreservesDefaultBrowserAndRules() throws {
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .firefoxProfile(profileKey: "Profiles/personal.default"),
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .firefoxProfile(profileKey: "Profiles/personal.default"),
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
@@ -16,17 +16,17 @@ final class RouterConfigCodingTests: XCTestCase {
                 SourceAppRule(
                     id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
                     sourceBundleID: "com.apple.mail",
-                    target: .fallbackBrowser
+                    target: .defaultBrowser
                 ),
                 SourceAppRule(
                     id: UUID(uuidString: "22222222-3333-4444-5555-666666666666")!,
                     sourceBundleID: "org.mozilla.firefox",
-                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default")
+                    target: .defaultBrowserFirefoxProfile(profileKey: "Profiles/work.default")
                 ),
                 SourceAppRule(
                     id: UUID(uuidString: "33333333-4444-5555-6666-777777777777")!,
                     sourceBundleID: "app.zen-browser.zen",
-                    target: .fallbackBrowserZenContainer(containerName: "Work")
+                    target: .defaultBrowserZenContainer(containerName: "Work")
                 ),
             ]
         )
@@ -39,9 +39,9 @@ final class RouterConfigCodingTests: XCTestCase {
 
     func testRoundTripSupportsEmptyRules() throws {
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.google.Chrome",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Google Chrome.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.google.Chrome",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Google Chrome.app"),
+            defaultBrowserRoute: .plain,
             rules: []
         )
 
@@ -51,11 +51,11 @@ final class RouterConfigCodingTests: XCTestCase {
         XCTAssertEqual(decoded, config)
     }
 
-    func testRoundTripSupportsFallbackHeliumProfileRoute() throws {
+    func testRoundTripSupportsDefaultHeliumProfileRoute() throws {
         let config = RouterConfig(
-            fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-            fallbackBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+            defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
             rules: []
         )
 
@@ -65,31 +65,31 @@ final class RouterConfigCodingTests: XCTestCase {
         XCTAssertEqual(decoded, config)
     }
 
-    func testDecodeDefaultsMissingFallbackBrowserRouteToPlain() throws {
-        let expectedConfig = RouterConfig(
-            fallbackBrowserBundleID: "org.mozilla.firefox",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
-            fallbackBrowserRoute: .plain,
+    func testDecodeThrowsWhenDefaultBrowserRouteKeyMissing() throws {
+        let config = RouterConfig(
+            defaultBrowserBundleID: "org.mozilla.firefox",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    target: .fallbackBrowserFirefoxProfile(profileKey: "Profiles/work.default")
+                    target: .defaultBrowserFirefoxProfile(profileKey: "Profiles/work.default")
                 ),
             ]
         )
 
-        let legacyData = try makeLegacyConfigData(from: expectedConfig)
-        let decoded = try JSONDecoder().decode(RouterConfig.self, from: legacyData)
-
-        XCTAssertEqual(decoded, expectedConfig)
-    }
-
-    private func makeLegacyConfigData(from config: RouterConfig) throws -> Data {
         let encodedConfig = try JSONEncoder().encode(config)
-        let jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
-        var legacyJSONObject = jsonObject
-        legacyJSONObject.removeValue(forKey: "fallbackBrowserRoute")
-        return try JSONSerialization.data(withJSONObject: legacyJSONObject, options: [.sortedKeys])
+        var jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
+        jsonObject.removeValue(forKey: "defaultBrowserRoute")
+        let incompleteData = try JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys])
+
+        XCTAssertThrowsError(try JSONDecoder().decode(RouterConfig.self, from: incompleteData)) { error in
+            guard case DecodingError.keyNotFound(let key, _) = error else {
+                XCTFail("Expected keyNotFound, got \(error)")
+                return
+            }
+            XCTAssertEqual(key.stringValue, "defaultBrowserRoute")
+        }
     }
 }

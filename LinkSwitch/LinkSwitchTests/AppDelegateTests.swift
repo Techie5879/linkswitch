@@ -33,7 +33,7 @@ final class AppDelegateTests: XCTestCase {
         intakeHandler.expectedCallCount = 1
         appDelegate.sourceBundleIDResolver = StubSourceBundleIDResolver(sourceBundleID: nil)
         appDelegate.urlIntakeHandler = intakeHandler
-        let url = URL(string: "https://example.com/fallback")!
+        let url = URL(string: "https://example.com/default-browser")!
 
         appDelegate.application(NSApplication.shared, open: [url])
 

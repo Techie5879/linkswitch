@@ -16,9 +16,9 @@ final class RouterConfigStoreTests: XCTestCase {
             .appendingPathComponent("router-config.json", isDirectory: false)
         let store = RouterConfigStore(configFileURL: configFileURL)
         let config = RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
@@ -40,9 +40,9 @@ final class RouterConfigStoreTests: XCTestCase {
         let configFileURL = configDirectoryURL.appendingPathComponent("router-config.json", isDirectory: false)
         let store = RouterConfigStore(configFileURL: configFileURL)
         let config = RouterConfig(
-            fallbackBrowserBundleID: "app.zen-browser.zen",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
-            fallbackBrowserRoute: .zenContainer(containerName: "Work"),
+            defaultBrowserBundleID: "app.zen-browser.zen",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Zen.app"),
+            defaultBrowserRoute: .zenContainer(containerName: "Work"),
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
@@ -57,27 +57,36 @@ final class RouterConfigStoreTests: XCTestCase {
         XCTAssertEqual(try store.load(), config)
     }
 
-    func testLoadDefaultsMissingFallbackBrowserRouteToPlainForExistingConfigFile() throws {
+    func testLoadThrowsWhenDefaultBrowserRouteKeyMissing() throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
         let store = RouterConfigStore(configFileURL: configFileURL)
-        let expectedConfig = RouterConfig(
-            fallbackBrowserBundleID: "org.mozilla.firefox",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
-            fallbackBrowserRoute: .plain,
+        let config = RouterConfig(
+            defaultBrowserBundleID: "org.mozilla.firefox",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Firefox.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    target: .fallbackBrowser
+                    target: .defaultBrowser
                 ),
             ]
         )
 
-        let legacyData = try makeLegacyConfigData(from: expectedConfig)
-        try legacyData.write(to: configFileURL)
+        let encodedConfig = try JSONEncoder().encode(config)
+        var jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
+        jsonObject.removeValue(forKey: "defaultBrowserRoute")
+        let incompleteData = try JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys])
+        try incompleteData.write(to: configFileURL)
 
-        XCTAssertEqual(try store.load(), expectedConfig)
+        XCTAssertThrowsError(try store.load()) { error in
+            guard case DecodingError.keyNotFound(let key, _) = error else {
+                XCTFail("Expected keyNotFound, got \(error)")
+                return
+            }
+            XCTAssertEqual(key.stringValue, "defaultBrowserRoute")
+        }
     }
 
     private func makeTemporaryDirectory() throws -> URL {
@@ -88,13 +97,5 @@ final class RouterConfigStoreTests: XCTestCase {
             try? FileManager.default.removeItem(at: temporaryDirectory)
         }
         return temporaryDirectory
-    }
-
-    private func makeLegacyConfigData(from config: RouterConfig) throws -> Data {
-        let encodedConfig = try JSONEncoder().encode(config)
-        let jsonObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedConfig) as? [String: Any])
-        var legacyJSONObject = jsonObject
-        legacyJSONObject.removeValue(forKey: "fallbackBrowserRoute")
-        return try JSONSerialization.data(withJSONObject: legacyJSONObject, options: [.sortedKeys])
     }
 }

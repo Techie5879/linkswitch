@@ -66,12 +66,12 @@ final class URLIntakeControllerTests: XCTestCase {
             [
                 BrowserLauncherSpy.OpenCall(
                     url: firstURL,
-                    target: .fallbackBrowser,
+                    target: .defaultBrowser,
                     config: makeConfig()
                 ),
                 BrowserLauncherSpy.OpenCall(
                     url: secondURL,
-                    target: .fallbackBrowser,
+                    target: .defaultBrowser,
                     config: makeConfig()
                 ),
             ]
@@ -80,9 +80,9 @@ final class URLIntakeControllerTests: XCTestCase {
 
     private func makeConfig() -> RouterConfig {
         RouterConfig(
-            fallbackBrowserBundleID: "com.apple.Safari",
-            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
-            fallbackBrowserRoute: .plain,
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
