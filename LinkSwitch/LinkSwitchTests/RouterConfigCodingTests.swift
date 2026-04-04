@@ -51,6 +51,20 @@ final class RouterConfigCodingTests: XCTestCase {
         XCTAssertEqual(decoded, config)
     }
 
+    func testRoundTripSupportsFallbackHeliumProfileRoute() throws {
+        let config = RouterConfig(
+            fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+            fallbackBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            rules: []
+        )
+
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(RouterConfig.self, from: data)
+
+        XCTAssertEqual(decoded, config)
+    }
+
     func testDecodeDefaultsMissingFallbackBrowserRouteToPlain() throws {
         let expectedConfig = RouterConfig(
             fallbackBrowserBundleID: "org.mozilla.firefox",

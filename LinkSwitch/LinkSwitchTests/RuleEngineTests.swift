@@ -87,6 +87,24 @@ final class RuleEngineTests: XCTestCase {
         )
     }
 
+    func testUnknownSourceUsesConfiguredFallbackHeliumProfile() {
+        let context = IncomingOpenContext(
+            url: URL(string: "https://example.com")!,
+            sourceBundleID: "com.apple.mail"
+        )
+        let config = RouterConfig(
+            fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+            fallbackBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            rules: []
+        )
+
+        XCTAssertEqual(
+            ruleEngine.target(for: context, config: config),
+            .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1")
+        )
+    }
+
     func testUnknownSourceUsesConfiguredFallbackZenContainer() {
         let context = IncomingOpenContext(
             url: URL(string: "https://example.com")!,

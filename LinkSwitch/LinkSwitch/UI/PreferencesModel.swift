@@ -24,8 +24,10 @@ enum PreferencesModelError: Error, Equatable {
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
+    case emptyFallbackBrowserHeliumProfile(UUID)
     case emptyFallbackBrowserFirefoxProfile(UUID)
     case emptyFallbackBrowserZenContainer(UUID)
+    case emptyFallbackBrowserDefaultHeliumProfile
     case emptyFallbackBrowserDefaultFirefoxProfile
     case emptyFallbackBrowserDefaultZenContainer
     case emptyHeliumProfileDirectory(UUID)
@@ -98,6 +100,14 @@ final class PreferencesModel {
                     sourceBundleID: rule.sourceBundleID,
                     targetKind: .fallbackBrowser,
                     fallbackBrowserRoute: .plain,
+                    heliumProfileDirectory: ""
+                )
+            case let .fallbackBrowserHeliumProfile(profileDirectory):
+                return PreferencesRuleDraft(
+                    id: rule.id,
+                    sourceBundleID: rule.sourceBundleID,
+                    targetKind: .fallbackBrowser,
+                    fallbackBrowserRoute: .heliumProfile(profileDirectory: profileDirectory),
                     heliumProfileDirectory: ""
                 )
             case let .fallbackBrowserFirefoxProfile(profileKey):
@@ -333,6 +343,13 @@ final class PreferencesModel {
         switch route {
         case .plain:
             return .plain
+        case let .heliumProfile(profileDirectory):
+            let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedProfileDirectory.isEmpty else {
+                AppLogger.error("Default fallback browser route had an empty Helium profile directory", category: .config)
+                throw PreferencesModelError.emptyFallbackBrowserDefaultHeliumProfile
+            }
+            return .heliumProfile(profileDirectory: trimmedProfileDirectory)
         case let .firefoxProfile(profileKey):
             let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedProfileKey.isEmpty else {
@@ -356,6 +373,13 @@ final class PreferencesModel {
             switch draft.fallbackBrowserRoute {
             case .plain:
                 return .fallbackBrowser
+            case let .heliumProfile(profileDirectory):
+                let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedProfileDirectory.isEmpty else {
+                    AppLogger.error("Preferences rule \(draft.id) had an empty fallback Helium profile directory", category: .config)
+                    throw PreferencesModelError.emptyFallbackBrowserHeliumProfile(draft.id)
+                }
+                return .fallbackBrowserHeliumProfile(profileDirectory: trimmedProfileDirectory)
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
@@ -408,35 +432,39 @@ final class PreferencesModel {
         }
     }
 
-    private func fallbackBrowserCompatibility(forBundleID bundleID: String) -> FallbackBrowserCompatibility {
-        if bundleID == FirefoxBrowserAppSupportPath.zenBrowserBundleID {
-            return .zenContainer
-        }
-        if FirefoxBrowserAppSupportPath.supportsFallbackProfileRouting(forBundleID: bundleID) {
-            return .firefoxProfile
-        }
-        return .plainOnly
+    private func fallbackBrowserCompatibility(forBundleID bundleID: String) -> FallbackBrowserProfileSupport {
+        FallbackBrowserProfileSupport.forBundleID(bundleID)
     }
 
     private func normalizedFallbackRoute(
         _ route: FallbackBrowserRoute,
-        compatibility: FallbackBrowserCompatibility
+        compatibility: FallbackBrowserProfileSupport
     ) -> FallbackBrowserRoute {
-        switch (compatibility, route) {
-        case (.firefoxProfile, .zenContainer),
-             (.zenContainer, .firefoxProfile),
-             (.plainOnly, .firefoxProfile),
-             (.plainOnly, .zenContainer):
+        switch compatibility {
+        case .plainOnly:
             return .plain
-        default:
-            return route
+        case .heliumProfile:
+            switch route {
+            case .plain, .heliumProfile:
+                return route
+            case .firefoxProfile, .zenContainer:
+                return .plain
+            }
+        case .firefoxProfile:
+            switch route {
+            case .plain, .firefoxProfile:
+                return route
+            case .heliumProfile, .zenContainer:
+                return .plain
+            }
+        case .zenContainer:
+            switch route {
+            case .plain, .zenContainer:
+                return route
+            case .heliumProfile, .firefoxProfile:
+                return .plain
+            }
         }
-    }
-
-    private enum FallbackBrowserCompatibility {
-        case plainOnly
-        case firefoxProfile
-        case zenContainer
     }
 
     private func makeSampleURL() throws -> URL {

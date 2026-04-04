@@ -2,6 +2,7 @@ import Foundation
 
 enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
     case plain
+    case heliumProfile(profileDirectory: String)
     case firefoxProfile(profileKey: String)
     case zenContainer(containerName: String)
 
@@ -9,6 +10,8 @@ enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
         switch self {
         case .plain:
             return "plain"
+        case let .heliumProfile(profileDirectory):
+            return "heliumProfile(profileDirectory: \(profileDirectory))"
         case let .firefoxProfile(profileKey):
             return "firefoxProfile(profileKey: \(profileKey))"
         case let .zenContainer(containerName):
@@ -21,6 +24,8 @@ enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
         switch self {
         case .plain:
             return .fallbackBrowser
+        case let .heliumProfile(profileDirectory):
+            return .fallbackBrowserHeliumProfile(profileDirectory: profileDirectory)
         case let .firefoxProfile(profileKey):
             return .fallbackBrowserFirefoxProfile(profileKey: profileKey)
         case let .zenContainer(containerName):
@@ -31,6 +36,7 @@ enum FallbackBrowserRoute: Codable, Equatable, CustomStringConvertible {
 
 enum BrowserTarget: Codable, Equatable, CustomStringConvertible {
     case fallbackBrowser
+    case fallbackBrowserHeliumProfile(profileDirectory: String)
     case fallbackBrowserFirefoxProfile(profileKey: String)
     case fallbackBrowserZenContainer(containerName: String)
     case helium(profileDirectory: String)
@@ -39,6 +45,8 @@ enum BrowserTarget: Codable, Equatable, CustomStringConvertible {
         switch self {
         case .fallbackBrowser:
             return "fallbackBrowser"
+        case let .fallbackBrowserHeliumProfile(profileDirectory):
+            return "fallbackBrowserHeliumProfile(profileDirectory: \(profileDirectory))"
         case let .fallbackBrowserFirefoxProfile(profileKey):
             return "fallbackBrowserFirefoxProfile(profileKey: \(profileKey))"
         case let .fallbackBrowserZenContainer(containerName):

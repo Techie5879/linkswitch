@@ -25,6 +25,41 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
+    func testOpenFallbackHeliumProfileLaunchesConfiguredFallbackAppWithProfileArguments() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let url = URL(string: "https://example.com/fallback-helium")!
+        let config = RouterConfig(
+            fallbackBrowserBundleID: BrowserLauncher.heliumBundleID,
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+            fallbackBrowserRoute: .plain,
+            rules: []
+        )
+
+        try await launcher.open(
+            url,
+            target: .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1"),
+            config: config
+        )
+
+        XCTAssertEqual(
+            workspaceLauncher.launchApplicationExecutableCalls,
+            [
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
+                    applicationURL: config.fallbackBrowserAppURL,
+                    arguments: [
+                        "--profile-directory=Profile 1",
+                        "https://example.com/fallback-helium",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
+    }
+
     func testOpenHeliumResolvesAppURLAndLaunchesWithProfileArguments() async throws {
         let heliumApplicationURL = URL(fileURLWithPath: "/Applications/Helium.app")
         let workspaceLauncher = WorkspaceLaunchSpy()
@@ -146,6 +181,33 @@ final class BrowserLauncherTests: XCTestCase {
             XCTAssertEqual(
                 error as? BrowserLauncherError,
                 .unsupportedFallbackBrowserProfile(bundleID: "com.apple.Safari")
+            )
+        }
+    }
+
+    func testOpenFallbackHeliumProfileThrowsForUnsupportedFallbackBrowserBundleID() async {
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: WorkspaceLaunchSpy()
+        )
+        let config = RouterConfig(
+            fallbackBrowserBundleID: "com.apple.Safari",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
+            rules: []
+        )
+
+        do {
+            try await launcher.open(
+                URL(string: "https://example.com/helium")!,
+                target: .fallbackBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                config: config
+            )
+            XCTFail("Expected open to throw")
+        } catch {
+            XCTAssertEqual(
+                error as? BrowserLauncherError,
+                .unsupportedFallbackBrowserHeliumProfile(bundleID: "com.apple.Safari")
             )
         }
     }

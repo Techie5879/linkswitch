@@ -25,6 +25,7 @@ protocol RunningApplicationActivating {
 }
 
 enum BrowserLauncherError: Error, Equatable {
+    case unsupportedFallbackBrowserHeliumProfile(bundleID: String)
     case unsupportedFallbackBrowserProfile(bundleID: String)
     case unsupportedFallbackBrowserContainer(bundleID: String)
 }
@@ -69,8 +70,23 @@ struct BrowserLauncher {
                 category: .launch
             )
             try await workspaceLauncher.openURLs([url], withApplicationAt: config.fallbackBrowserAppURL)
+        case let .fallbackBrowserHeliumProfile(profileDirectory):
+            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .heliumProfile else {
+                AppLogger.error(
+                    "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Helium profile routing",
+                    category: .launch
+                )
+                throw BrowserLauncherError.unsupportedFallbackBrowserHeliumProfile(bundleID: config.fallbackBrowserBundleID)
+            }
+
+            let arguments = try HeliumLaunchArguments.make(url: url, profileDirectory: profileDirectory)
+            AppLogger.info(
+                "Routing URL \(url.absoluteString) to fallback browser \(config.fallbackBrowserBundleID) at \(config.fallbackBrowserAppURL.path()) with Helium profile arguments \(arguments)",
+                category: .launch
+            )
+            try await workspaceLauncher.launchApplicationExecutable(at: config.fallbackBrowserAppURL, arguments: arguments)
         case let .fallbackBrowserFirefoxProfile(profileKey):
-            guard FirefoxBrowserAppSupportPath.supportsFallbackProfileRouting(forBundleID: config.fallbackBrowserBundleID) else {
+            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .firefoxProfile else {
                 AppLogger.error(
                     "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Firefox-style profile routing",
                     category: .launch
@@ -91,7 +107,7 @@ struct BrowserLauncher {
             )
             try await workspaceLauncher.launchApplicationExecutable(at: config.fallbackBrowserAppURL, arguments: arguments)
         case let .fallbackBrowserZenContainer(containerName):
-            guard config.fallbackBrowserBundleID == FirefoxBrowserAppSupportPath.zenBrowserBundleID else {
+            guard FallbackBrowserProfileSupport.forBundleID(config.fallbackBrowserBundleID) == .zenContainer else {
                 AppLogger.error(
                     "Fallback browser bundle ID \(config.fallbackBrowserBundleID) does not support Zen container routing",
                     category: .launch
