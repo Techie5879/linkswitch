@@ -168,11 +168,21 @@ final class PreferencesViewController: NSViewController {
     private let configPathLabel = NSTextField(wrappingLabelWithString: "")
     private let sampleURLField = NSTextField(string: "")
     private let rulesStackView = NSStackView()
+    private let rulesInfoLabel = NSTextField(wrappingLabelWithString: "")
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
+    private let rawConfigCard = CardView()
     private let rawConfigValidationLabel = NSTextField(wrappingLabelWithString: "")
+    private let rawConfigContentStack = NSStackView()
     private let rawConfigScrollView = NSScrollView()
     private let rawConfigTextView = NSTextView()
+    private var isRawConfigExpanded = false
     private var autoSaveTimer: Timer?
+
+    private lazy var toggleRawConfigButton: NSButton = makeButton(
+        title: "View Raw Config",
+        action: #selector(toggleRawConfigVisibility(_:)),
+        accessibilityIdentifier: "preferences.toggleRawConfigButton"
+    )
 
     // MARK: Init
 
@@ -427,6 +437,15 @@ final class PreferencesViewController: NSViewController {
 
     private func makeRulesSectionHeader() -> NSStackView {
         let titleLabel = makeSectionLabel("Source-App Rules")
+        rulesInfoLabel.maximumNumberOfLines = 0
+        rulesInfoLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        rulesInfoLabel.textColor = .secondaryLabelColor
+        rulesInfoLabel.setAccessibilityIdentifier("preferences.rulesInfoLabel")
+
+        let titleStack = NSStackView(views: [titleLabel, rulesInfoLabel])
+        titleStack.orientation = .vertical
+        titleStack.alignment = .leading
+        titleStack.spacing = 4
 
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -437,9 +456,9 @@ final class PreferencesViewController: NSViewController {
             accessibilityIdentifier: "preferences.addRuleButton"
         )
 
-        let row = NSStackView(views: [titleLabel, spacer, reloadButton, saveButton, addButton])
+        let row = NSStackView(views: [titleStack, spacer, reloadButton, saveButton, addButton])
         row.orientation = .horizontal
-        row.alignment = .centerY
+        row.alignment = .top
         row.spacing = 8
         return row
     }
@@ -478,10 +497,16 @@ final class PreferencesViewController: NSViewController {
     }
 
     private func makeRawConfigCard() -> NSView {
-        let card = CardView()
-        card.translatesAutoresizingMaskIntoConstraints = false
+        rawConfigCard.translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = makeSectionLabel("Raw Config")
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let headerRow = NSStackView(views: [titleLabel, spacer, toggleRawConfigButton])
+        headerRow.orientation = .horizontal
+        headerRow.alignment = .centerY
+        headerRow.spacing = 8
 
         rawConfigValidationLabel.maximumNumberOfLines = 0
         rawConfigValidationLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -505,24 +530,33 @@ final class PreferencesViewController: NSViewController {
         rawConfigScrollView.borderType = .bezelBorder
         rawConfigScrollView.documentView = rawConfigTextView
 
-        let contentStack = NSStackView(views: [titleLabel, rawConfigValidationLabel, rawConfigScrollView])
+        rawConfigContentStack.orientation = .vertical
+        rawConfigContentStack.alignment = .leading
+        rawConfigContentStack.spacing = 12
+        rawConfigContentStack.addArrangedSubview(rawConfigValidationLabel)
+        rawConfigContentStack.addArrangedSubview(rawConfigScrollView)
+
+        let contentStack = NSStackView(views: [headerRow, rawConfigContentStack])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
         contentStack.spacing = 12
 
-        card.addSubview(contentStack)
+        rawConfigCard.addSubview(contentStack)
         NSLayoutConstraint.activate([
-            contentStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
-            contentStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
-            contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
-            contentStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
-            rawConfigValidationLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            rawConfigScrollView.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            rawConfigScrollView.heightAnchor.constraint(equalToConstant: 180),
+            contentStack.leadingAnchor.constraint(equalTo: rawConfigCard.leadingAnchor, constant: 16),
+            contentStack.trailingAnchor.constraint(equalTo: rawConfigCard.trailingAnchor, constant: -16),
+            contentStack.topAnchor.constraint(equalTo: rawConfigCard.topAnchor, constant: 16),
+            contentStack.bottomAnchor.constraint(equalTo: rawConfigCard.bottomAnchor, constant: -16),
+            headerRow.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            rawConfigContentStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            rawConfigValidationLabel.widthAnchor.constraint(equalTo: rawConfigContentStack.widthAnchor),
+            rawConfigScrollView.widthAnchor.constraint(equalTo: rawConfigContentStack.widthAnchor),
+            rawConfigScrollView.heightAnchor.constraint(equalToConstant: 280),
         ])
 
-        return card
+        refreshRawConfigVisibility()
+        return rawConfigCard
     }
 
     // MARK: refreshUI
@@ -543,15 +577,25 @@ final class PreferencesViewController: NSViewController {
     private func refreshRawConfigPreview() {
         let validationMessage = model.configValidationMessage()
         if let validationMessage {
+            rulesInfoLabel.stringValue = validationMessage
+            rulesInfoLabel.textColor = .systemOrange
             rawConfigValidationLabel.stringValue = validationMessage
             rawConfigValidationLabel.textColor = .systemOrange
+            rawConfigValidationLabel.isHidden = false
             saveButton.isEnabled = false
         } else {
-            rawConfigValidationLabel.stringValue = "Config is valid. Changes save automatically."
-            rawConfigValidationLabel.textColor = .secondaryLabelColor
+            rulesInfoLabel.stringValue = "Changes save automatically."
+            rulesInfoLabel.textColor = .secondaryLabelColor
+            rawConfigValidationLabel.stringValue = ""
+            rawConfigValidationLabel.isHidden = true
             saveButton.isEnabled = true
         }
         rawConfigTextView.string = model.rawConfigPreview()
+    }
+
+    private func refreshRawConfigVisibility() {
+        rawConfigContentStack.isHidden = !isRawConfigExpanded
+        toggleRawConfigButton.title = isRawConfigExpanded ? "Collapse Raw Config" : "View Raw Config"
     }
 
     private func scheduleAutoSave() {
@@ -925,6 +969,14 @@ final class PreferencesViewController: NSViewController {
 
     @objc private func sampleURLChanged(_ sender: Any?) {
         syncSampleURLField()
+    }
+
+    @objc private func toggleRawConfigVisibility(_ sender: Any?) {
+        isRawConfigExpanded.toggle()
+        refreshRawConfigVisibility()
+        guard isRawConfigExpanded else { return }
+        view.layoutSubtreeIfNeeded()
+        rawConfigCard.scrollToVisible(rawConfigCard.bounds)
     }
 
     @objc private func registerLinkSwitchAsDefaultHandler(_ sender: Any?) {
