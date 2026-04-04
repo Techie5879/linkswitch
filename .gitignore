@@ -41,3 +41,6 @@ Dependencies/
 
 # Local development logs
 logs/
+
+# Coverage artifacts
+*.profraw

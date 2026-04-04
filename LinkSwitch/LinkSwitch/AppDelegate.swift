@@ -13,44 +13,13 @@ private enum LaunchArgument {
 
 private enum StatusItemIcon {
     static func makeTemplateImage() -> NSImage {
-        let imageSize = NSSize(width: 18, height: 18)
-        let image = NSImage(size: imageSize, flipped: false) { _ in
-            NSColor.black.setFill()
-            NSColor.black.setStroke()
-
-            NSBezierPath(
-                roundedRect: NSRect(x: 2.0, y: 6.0, width: 4.5, height: 6.0),
-                xRadius: 1.2,
-                yRadius: 1.2
-            ).fill()
-
-            NSBezierPath(
-                roundedRect: NSRect(x: 11.0, y: 11.5, width: 5.0, height: 3.0),
-                xRadius: 1.0,
-                yRadius: 1.0
-            ).fill()
-
-            NSBezierPath(
-                roundedRect: NSRect(x: 11.0, y: 3.5, width: 5.0, height: 3.0),
-                xRadius: 1.0,
-                yRadius: 1.0
-            ).fill()
-
-            let routePath = NSBezierPath()
-            routePath.lineWidth = 2.0
-            routePath.lineCapStyle = .round
-            routePath.lineJoinStyle = .round
-            routePath.move(to: NSPoint(x: 1.0, y: 9.0))
-            routePath.line(to: NSPoint(x: 2.0, y: 9.0))
-            routePath.move(to: NSPoint(x: 6.5, y: 9.0))
-            routePath.line(to: NSPoint(x: 9.0, y: 9.0))
-            routePath.line(to: NSPoint(x: 9.0, y: 13.0))
-            routePath.line(to: NSPoint(x: 11.0, y: 13.0))
-            routePath.move(to: NSPoint(x: 9.0, y: 9.0))
-            routePath.line(to: NSPoint(x: 9.0, y: 5.0))
-            routePath.line(to: NSPoint(x: 11.0, y: 5.0))
-            routePath.stroke()
-            return true
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        guard
+            let base = NSImage(systemSymbolName: "shuffle", accessibilityDescription: nil),
+            let image = base.withSymbolConfiguration(config)
+        else {
+            AppLogger.error("Failed to load SF Symbol 'shuffle' for status item", category: .app)
+            return NSImage()
         }
         image.isTemplate = true
         return image
@@ -308,4 +277,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return viewController
     }
 }
-
