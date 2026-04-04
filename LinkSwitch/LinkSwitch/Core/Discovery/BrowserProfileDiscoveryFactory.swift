@@ -14,7 +14,7 @@ struct BrowserProfileDiscoveryFactory {
     }
 
     func makeDiscoverer(forBundleID bundleID: String) -> (any BrowserProfileDiscovering)? {
-        if let relativePath = ChromiumBrowserAppSupportPath.relativePath(forBundleID: bundleID) {
+        if let relativePath = ChromiumBrowserAppSupportPath.discoveryRelativePath(forBundleID: bundleID) {
             let localStateURL = appSupportURL
                 .appendingPathComponent(relativePath)
                 .appendingPathComponent("Local State")

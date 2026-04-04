@@ -11,7 +11,7 @@ enum DefaultBrowserProfileSupport: Equatable {
         if bundleID == FirefoxBrowserAppSupportPath.zenBrowserBundleID {
             return .zenContainer
         }
-        if ChromiumBrowserAppSupportPath.relativePath(forBundleID: bundleID) != nil {
+        if ChromiumBrowserAppSupportPath.supportsProfileLaunch(forBundleID: bundleID) {
             return .chromiumProfile
         }
         if FirefoxBrowserAppSupportPath.supportsDefaultProfileRouting(forBundleID: bundleID) {

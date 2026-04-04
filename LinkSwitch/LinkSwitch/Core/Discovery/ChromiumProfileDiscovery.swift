@@ -93,45 +93,63 @@ private struct LocalState: Decodable {
     }
 }
 
-// MARK: - Known Chromium browser Application Support relative paths
+// MARK: - Known Chromium browser capabilities
 
-/// Maps bundle IDs of Chromium-based browsers to their Application Support subdirectory path
-/// (relative to ~/Library/Application Support/). Used by BrowserProfileDiscoveryFactory.
+/// Chromium browser registry keyed by bundle ID.
+/// Keeps discovery location and launch support together so callers can ask
+/// explicit questions without duplicating browser lists in multiple files.
 enum ChromiumBrowserAppSupportPath {
-    /// Returns the Application Support relative path for the given bundle ID, or nil if unknown.
-    static func relativePath(forBundleID bundleID: String) -> String? {
+    private struct Capabilities {
+        let discoveryRelativePath: String
+        let supportsProfileLaunch: Bool
+    }
+
+    private static func capabilities(forBundleID bundleID: String) -> Capabilities? {
         switch bundleID {
         case "net.imput.helium":
-            return "net.imput.helium"
+            return Capabilities(discoveryRelativePath: "net.imput.helium", supportsProfileLaunch: true)
         case "com.google.Chrome":
-            return "Google/Chrome"
+            return Capabilities(discoveryRelativePath: "Google/Chrome", supportsProfileLaunch: true)
         case "com.google.Chrome.canary":
-            return "Google/Chrome Canary"
+            return Capabilities(discoveryRelativePath: "Google/Chrome Canary", supportsProfileLaunch: true)
         case "com.google.Chrome.beta":
-            return "Google/Chrome Beta"
+            return Capabilities(discoveryRelativePath: "Google/Chrome Beta", supportsProfileLaunch: true)
         case "com.google.Chrome.dev":
-            return "Google/Chrome Dev"
+            return Capabilities(discoveryRelativePath: "Google/Chrome Dev", supportsProfileLaunch: true)
         case "com.brave.Browser":
-            return "BraveSoftware/Brave-Browser"
+            return Capabilities(discoveryRelativePath: "BraveSoftware/Brave-Browser", supportsProfileLaunch: true)
         case "com.microsoft.edgemac":
-            return "Microsoft Edge"
+            return Capabilities(discoveryRelativePath: "Microsoft Edge", supportsProfileLaunch: true)
         case "com.microsoft.edgemac.Beta":
-            return "Microsoft Edge Beta"
+            return Capabilities(discoveryRelativePath: "Microsoft Edge Beta", supportsProfileLaunch: true)
         case "com.microsoft.edgemac.Dev":
-            return "Microsoft Edge Dev"
+            return Capabilities(discoveryRelativePath: "Microsoft Edge Dev", supportsProfileLaunch: true)
         case "com.microsoft.edgemac.Canary":
-            return "Microsoft Edge Canary"
+            return Capabilities(discoveryRelativePath: "Microsoft Edge Canary", supportsProfileLaunch: true)
         case "com.vivaldi.Vivaldi":
-            return "Vivaldi"
+            return Capabilities(discoveryRelativePath: "Vivaldi", supportsProfileLaunch: true)
         case "company.thebrowser.Browser":
             // Arc inserts an extra "User Data" level like Windows Chrome layout.
-            return "Arc/User Data"
+            return Capabilities(discoveryRelativePath: "Arc/User Data", supportsProfileLaunch: true)
         case "com.operasoftware.Opera":
-            return "com.operasoftware.Opera"
+            return Capabilities(discoveryRelativePath: "com.operasoftware.Opera", supportsProfileLaunch: true)
         case "org.chromium.Chromium":
-            return "Chromium"
+            return Capabilities(discoveryRelativePath: "Chromium", supportsProfileLaunch: true)
         default:
             return nil
         }
+    }
+
+    /// Returns the Application Support relative path for Chromium profile discovery.
+    static func discoveryRelativePath(forBundleID bundleID: String) -> String? {
+        capabilities(forBundleID: bundleID)?.discoveryRelativePath
+    }
+
+    static func supportsProfileDiscovery(forBundleID bundleID: String) -> Bool {
+        discoveryRelativePath(forBundleID: bundleID) != nil
+    }
+
+    static func supportsProfileLaunch(forBundleID bundleID: String) -> Bool {
+        capabilities(forBundleID: bundleID)?.supportsProfileLaunch ?? false
     }
 }

@@ -103,6 +103,37 @@ final class ChromiumProfileDiscoveryTests: XCTestCase {
     }
 }
 
+final class ChromiumBrowserAppSupportPathTests: XCTestCase {
+    func testKnownChromiumBrowserExposesDiscoveryPathAndLaunchSupport() {
+        XCTAssertEqual(
+            ChromiumBrowserAppSupportPath.discoveryRelativePath(forBundleID: "com.google.Chrome"),
+            "Google/Chrome"
+        )
+        XCTAssertTrue(ChromiumBrowserAppSupportPath.supportsProfileDiscovery(forBundleID: "com.google.Chrome"))
+        XCTAssertTrue(ChromiumBrowserAppSupportPath.supportsProfileLaunch(forBundleID: "com.google.Chrome"))
+    }
+
+    func testUnknownBrowserExposesNeitherDiscoveryNorLaunchSupport() {
+        XCTAssertNil(ChromiumBrowserAppSupportPath.discoveryRelativePath(forBundleID: "com.apple.Safari"))
+        XCTAssertFalse(ChromiumBrowserAppSupportPath.supportsProfileDiscovery(forBundleID: "com.apple.Safari"))
+        XCTAssertFalse(ChromiumBrowserAppSupportPath.supportsProfileLaunch(forBundleID: "com.apple.Safari"))
+    }
+}
+
+final class BrowserProfileDiscoveryFactoryTests: XCTestCase {
+    func testMakeDiscovererReturnsChromiumDiscovererForDiscoveryCapableBrowser() {
+        let factory = BrowserProfileDiscoveryFactory(appSupportURL: FileManager.default.temporaryDirectory)
+
+        XCTAssertNotNil(factory.makeDiscoverer(forBundleID: "com.google.Chrome"))
+    }
+
+    func testMakeDiscovererReturnsNilForBrowserWithoutDiscoverySupport() {
+        let factory = BrowserProfileDiscoveryFactory(appSupportURL: FileManager.default.temporaryDirectory)
+
+        XCTAssertNil(factory.makeDiscoverer(forBundleID: "com.apple.Safari"))
+    }
+}
+
 final class FirefoxProfileDiscoveryTests: XCTestCase {
     func testDiscoverProfilesReturnsAllProfileSections() throws {
         let (dir, url) = try makeProfilesIni(content: """
