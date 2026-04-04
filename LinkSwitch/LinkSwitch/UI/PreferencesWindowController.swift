@@ -829,6 +829,7 @@ final class PreferencesViewController: NSViewController {
                 }
             )
             rulesStackView.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: rulesStackView.widthAnchor).isActive = true
         }
     }
 
@@ -1308,9 +1309,11 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         mainPickerStack.orientation = .horizontal
         mainPickerStack.alignment = .centerY
         mainPickerStack.spacing = 12
+        mainPickerStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let rowSpacer = NSView()
         rowSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        rowSpacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let topRow = NSStackView(views: [mainPickerStack, rowSpacer, testButton, removeButton])
         topRow.orientation = .horizontal
