@@ -24,7 +24,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
             )
         )
-        preferencesModel.updateRuleBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
+        preferencesModel.updateRuleBrowserRoute(id: ruleID, route: .chromiumProfile(profileDirectory: "Profile 1"))
         try preferencesModel.save()
 
         let browserLauncher = RoutingPipelineBrowserLauncherSpy()
@@ -44,7 +44,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/work")!,
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Profile 1"
@@ -57,7 +57,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                             SourceAppRule(
                                 id: ruleID,
                                 sourceBundleID: "com.tinyspeck.slackmacgap",
-                                target: .applicationHeliumProfile(
+                                target: .applicationChromiumProfile(
                                     bundleID: BrowserLauncher.heliumBundleID,
                                     applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                                     profileDirectory: "Profile 1"
@@ -93,7 +93,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
             )
         )
-        preferencesModel.updateRuleBrowserRoute(id: slackRuleID, route: .heliumProfile(profileDirectory: "Aritra"))
+        preferencesModel.updateRuleBrowserRoute(id: slackRuleID, route: .chromiumProfile(profileDirectory: "Aritra"))
 
         let notionRuleID = preferencesModel.addRule()
         preferencesModel.updateRuleSourceBundleID(id: notionRuleID, value: "notion.id")
@@ -104,7 +104,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
             )
         )
-        preferencesModel.updateRuleBrowserRoute(id: notionRuleID, route: .heliumProfile(profileDirectory: "Brighterway"))
+        preferencesModel.updateRuleBrowserRoute(id: notionRuleID, route: .chromiumProfile(profileDirectory: "Brighterway"))
 
         try preferencesModel.save()
 
@@ -132,7 +132,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 SourceAppRule(
                     id: slackRuleID,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Aritra"
@@ -141,7 +141,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 SourceAppRule(
                     id: notionRuleID,
                     sourceBundleID: "notion.id",
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Brighterway"
@@ -155,7 +155,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/from-slack")!,
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Aritra"
@@ -164,7 +164,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
                 ),
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/from-notion")!,
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Brighterway"
@@ -265,7 +265,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
     }
 
     @MainActor
-    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredDefaultBrowserHeliumProfile() async throws {
+    func testSavedPreferencesConfigRoutesUnknownSourceToConfiguredDefaultBrowserChromiumProfile() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
         let configStore = RouterConfigStore(configFileURL: configFileURL)
@@ -277,7 +277,7 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
 
         preferencesModel.defaultBrowserBundleID = BrowserLauncher.heliumBundleID
         preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Helium.app")
-        preferencesModel.updateDefaultBrowserRoute(.heliumProfile(profileDirectory: "Profile 1"))
+        preferencesModel.updateDefaultBrowserRoute(.chromiumProfile(profileDirectory: "Profile 1"))
         try preferencesModel.save()
 
         let browserLauncher = RoutingPipelineBrowserLauncherSpy()
@@ -297,11 +297,11 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
             [
                 RoutingPipelineBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/default-browser-helium")!,
-                    target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                    target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
                     config: RouterConfig(
                         defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
                         defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-                        defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+                        defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
                         rules: []
                     )
                 ),

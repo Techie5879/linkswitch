@@ -45,7 +45,7 @@ final class PreferencesModelTests: XCTestCase {
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
                     ),
-                    browserRoute: .heliumProfile(profileDirectory: "Profile 1")
+                    browserRoute: .chromiumProfile(profileDirectory: "Profile 1")
                 ),
             ]
         )
@@ -89,16 +89,16 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
-    func testLoadPopulatesDefaultBrowserHeliumProfileSelectionsFromStoredConfig() throws {
+    func testLoadPopulatesDefaultBrowserChromiumProfileSelectionsFromStoredConfig() throws {
         let config = RouterConfig(
             defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
             defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-            defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.apple.mail",
-                    target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 2")
+                    target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 2")
                 ),
             ]
         )
@@ -112,7 +112,7 @@ final class PreferencesModelTests: XCTestCase {
 
         try model.load()
 
-        XCTAssertEqual(model.defaultBrowserRoute, .heliumProfile(profileDirectory: "Profile 1"))
+        XCTAssertEqual(model.defaultBrowserRoute, .chromiumProfile(profileDirectory: "Profile 1"))
         XCTAssertEqual(
             model.ruleDrafts,
             [
@@ -120,7 +120,7 @@ final class PreferencesModelTests: XCTestCase {
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.apple.mail",
                     targetSelection: .defaultBrowser,
-                    browserRoute: .heliumProfile(profileDirectory: "Profile 2")
+                    browserRoute: .chromiumProfile(profileDirectory: "Profile 2")
                 ),
             ]
         )
@@ -174,7 +174,7 @@ final class PreferencesModelTests: XCTestCase {
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
                     ),
-                    browserRoute: .heliumProfile(profileDirectory: "Profile 1")
+                    browserRoute: .chromiumProfile(profileDirectory: "Profile 1")
                 ),
             ]
         )
@@ -446,7 +446,7 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
-    func testTestDefaultBrowserUsesConfiguredDefaultHeliumProfileRoute() async throws {
+    func testTestDefaultBrowserUsesConfiguredDefaultChromiumProfileRoute() async throws {
         let launcher = PreferencesBrowserLauncherSpy()
         let model = PreferencesModel(
             configStore: PreferencesConfigStoreStub(loadResult: nil),
@@ -455,7 +455,7 @@ final class PreferencesModelTests: XCTestCase {
         )
         model.defaultBrowserBundleID = BrowserLauncher.heliumBundleID
         model.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Helium.app")
-        model.defaultBrowserRoute = .heliumProfile(profileDirectory: "Profile 1")
+        model.defaultBrowserRoute = .chromiumProfile(profileDirectory: "Profile 1")
         model.sampleURLString = "https://example.com/default-browser-helium"
 
         try await model.testDefaultBrowser()
@@ -465,11 +465,11 @@ final class PreferencesModelTests: XCTestCase {
             [
                 PreferencesBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/default-browser-helium")!,
-                    target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                    target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
                     config: RouterConfig(
                         defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
                         defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-                        defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+                        defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
                         rules: []
                     )
                 ),
@@ -497,7 +497,7 @@ final class PreferencesModelTests: XCTestCase {
                 applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
             )
         )
-        model.updateRuleBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
+        model.updateRuleBrowserRoute(id: ruleID, route: .chromiumProfile(profileDirectory: "Profile 1"))
 
         try await model.testRule(id: ruleID)
 
@@ -506,7 +506,7 @@ final class PreferencesModelTests: XCTestCase {
             [
                 PreferencesBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/work")!,
-                    target: .applicationHeliumProfile(
+                    target: .applicationChromiumProfile(
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                         profileDirectory: "Profile 1"
@@ -519,7 +519,7 @@ final class PreferencesModelTests: XCTestCase {
                             SourceAppRule(
                                 id: ruleID,
                                 sourceBundleID: "com.tinyspeck.slackmacgap",
-                                target: .applicationHeliumProfile(
+                                target: .applicationChromiumProfile(
                                     bundleID: BrowserLauncher.heliumBundleID,
                                     applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
                                     profileDirectory: "Profile 1"
@@ -621,7 +621,7 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
-    func testTestRuleUsesDraftDefaultBrowserHeliumProfileTarget() async throws {
+    func testTestRuleUsesDraftDefaultBrowserChromiumProfileTarget() async throws {
         let launcher = PreferencesBrowserLauncherSpy()
         let model = PreferencesModel(
             configStore: PreferencesConfigStoreStub(loadResult: nil),
@@ -636,7 +636,7 @@ final class PreferencesModelTests: XCTestCase {
         model.sampleURLString = "https://example.com/work"
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
+        model.updateRuleBrowserRoute(id: ruleID, route: .chromiumProfile(profileDirectory: "Profile 1"))
 
         try await model.testRule(id: ruleID)
 
@@ -645,7 +645,7 @@ final class PreferencesModelTests: XCTestCase {
             [
                 PreferencesBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/work")!,
-                    target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                    target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
                     config: RouterConfig(
                         defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
                         defaultBrowserAppURL: heliumURL,
@@ -654,7 +654,7 @@ final class PreferencesModelTests: XCTestCase {
                             SourceAppRule(
                                 id: ruleID,
                                 sourceBundleID: "com.tinyspeck.slackmacgap",
-                                target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1")
+                                target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1")
                             ),
                         ]
                     )
@@ -686,7 +686,7 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSetDefaultBrowserNormalizesDefaultHeliumProfileRouteWhenSwitchingToNonHeliumBrowser() async throws {
+    func testSetDefaultBrowserNormalizesDefaultChromiumProfileRouteWhenSwitchingToNonChromiumBrowser() async throws {
         let heliumURL = try makeApplicationBundle(
             name: "Helium",
             bundleIdentifier: BrowserLauncher.heliumBundleID
@@ -701,7 +701,7 @@ final class PreferencesModelTests: XCTestCase {
             configFileURLDescription: "/tmp/router-config.json"
         )
         try model.setDefaultBrowser(applicationURL: heliumURL)
-        model.updateDefaultBrowserRoute(.heliumProfile(profileDirectory: "Profile 1"))
+        model.updateDefaultBrowserRoute(.chromiumProfile(profileDirectory: "Profile 1"))
         try model.setDefaultBrowser(applicationURL: safariURL)
 
         XCTAssertEqual(model.defaultBrowserRoute, .plain)

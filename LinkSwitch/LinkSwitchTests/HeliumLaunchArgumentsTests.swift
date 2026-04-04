@@ -1,9 +1,9 @@
 import XCTest
 @testable import LinkSwitch
 
-final class HeliumLaunchArgumentsTests: XCTestCase {
+final class ChromiumLaunchArgumentsTests: XCTestCase {
     func testMakeProducesProfileFlagAndURL() throws {
-        let arguments = try HeliumLaunchArguments.make(
+        let arguments = try ChromiumLaunchArguments.make(
             url: URL(string: "https://example.com/path?query=1#fragment")!,
             profileDirectory: "Profile 1"
         )
@@ -18,7 +18,7 @@ final class HeliumLaunchArgumentsTests: XCTestCase {
     }
 
     func testMakeTrimsWhitespaceAroundProfileDirectory() throws {
-        let arguments = try HeliumLaunchArguments.make(
+        let arguments = try ChromiumLaunchArguments.make(
             url: URL(string: "https://example.com")!,
             profileDirectory: "  Profile 1 \n"
         )
@@ -28,12 +28,12 @@ final class HeliumLaunchArgumentsTests: XCTestCase {
 
     func testMakeThrowsForEmptyProfileDirectory() {
         XCTAssertThrowsError(
-            try HeliumLaunchArguments.make(
+            try ChromiumLaunchArguments.make(
                 url: URL(string: "https://example.com")!,
                 profileDirectory: " \n "
             )
         ) { error in
-            XCTAssertEqual(error as? HeliumLaunchArgumentsError, .emptyProfileDirectory)
+            XCTAssertEqual(error as? ChromiumLaunchArgumentsError, .emptyProfileDirectory)
         }
     }
 }

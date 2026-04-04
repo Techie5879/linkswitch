@@ -41,10 +41,10 @@ enum PreferencesModelError: Error, Equatable {
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
-    case emptyRuleHeliumProfile(UUID)
+    case emptyRuleChromiumProfile(UUID)
     case emptyRuleFirefoxProfile(UUID)
     case emptyRuleZenContainer(UUID)
-    case emptyDefaultBrowserRouteHeliumProfile
+    case emptyDefaultBrowserRouteChromiumProfile
     case emptyDefaultBrowserRouteFirefoxProfile
     case emptyDefaultBrowserRouteZenContainer
     case missingRuleTargetApplication(UUID, bundleID: String)
@@ -65,14 +65,14 @@ extension PreferencesModelError: LocalizedError {
             return "The selected rule \(ruleID.uuidString) no longer exists."
         case let .emptySourceBundleID(ruleID):
             return "Rule \(ruleID.uuidString) is missing a source app bundle ID."
-        case let .emptyRuleHeliumProfile(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a Helium profile."
+        case let .emptyRuleChromiumProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a Chromium profile."
         case let .emptyRuleFirefoxProfile(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Firefox profile."
         case let .emptyRuleZenContainer(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Zen container."
-        case .emptyDefaultBrowserRouteHeliumProfile:
-            return "The default browser route is missing a Helium profile."
+        case .emptyDefaultBrowserRouteChromiumProfile:
+            return "The default browser route is missing a Chromium profile."
         case .emptyDefaultBrowserRouteFirefoxProfile:
             return "The default browser route is missing a Firefox profile."
         case .emptyDefaultBrowserRouteZenContainer:
@@ -151,12 +151,12 @@ final class PreferencesModel {
                     targetSelection: .defaultBrowser,
                     browserRoute: .plain
                 )
-            case let .defaultBrowserHeliumProfile(profileDirectory):
+            case let .defaultBrowserChromiumProfile(profileDirectory):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
                     targetSelection: .defaultBrowser,
-                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
+                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
                 )
             case let .defaultBrowserFirefoxProfile(profileKey):
                 return PreferencesRuleDraft(
@@ -179,12 +179,12 @@ final class PreferencesModel {
                     targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
                     browserRoute: .plain
                 )
-            case let .applicationHeliumProfile(bundleID, applicationURL, profileDirectory):
+            case let .applicationChromiumProfile(bundleID, applicationURL, profileDirectory):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
                     targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
-                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
+                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
                 )
             case let .applicationFirefoxProfile(bundleID, applicationURL, profileKey):
                 return PreferencesRuleDraft(
@@ -208,7 +208,7 @@ final class PreferencesModel {
                         bundleID: BrowserLauncher.heliumBundleID,
                         applicationURL: resolvedKnownApplicationURL(forBundleID: BrowserLauncher.heliumBundleID)
                     ),
-                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
+                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
                 )
             }
         }
@@ -444,13 +444,13 @@ final class PreferencesModel {
         switch route {
         case .plain:
             return .plain
-        case let .heliumProfile(profileDirectory):
+        case let .chromiumProfile(profileDirectory):
             let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedProfileDirectory.isEmpty else {
-                AppLogger.error("Default browser route had an empty Helium profile directory", category: .config)
-                throw PreferencesModelError.emptyDefaultBrowserRouteHeliumProfile
+                AppLogger.error("Default browser route had an empty Chromium profile directory", category: .config)
+                throw PreferencesModelError.emptyDefaultBrowserRouteChromiumProfile
             }
-            return .heliumProfile(profileDirectory: trimmedProfileDirectory)
+            return .chromiumProfile(profileDirectory: trimmedProfileDirectory)
         case let .firefoxProfile(profileKey):
             let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedProfileKey.isEmpty else {
@@ -474,13 +474,13 @@ final class PreferencesModel {
             switch draft.browserRoute {
             case .plain:
                 return .defaultBrowser
-            case let .heliumProfile(profileDirectory):
+            case let .chromiumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Helium profile directory", category: .config)
-                    throw PreferencesModelError.emptyRuleHeliumProfile(draft.id)
+                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Chromium profile directory", category: .config)
+                    throw PreferencesModelError.emptyRuleChromiumProfile(draft.id)
                 }
-                return .defaultBrowserHeliumProfile(profileDirectory: trimmedProfileDirectory)
+                return .defaultBrowserChromiumProfile(profileDirectory: trimmedProfileDirectory)
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
@@ -505,13 +505,13 @@ final class PreferencesModel {
             switch draft.browserRoute {
             case .plain:
                 return .application(bundleID: bundleID, applicationURL: resolvedApplicationURL)
-            case let .heliumProfile(profileDirectory):
+            case let .chromiumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty Helium profile directory", category: .config)
-                    throw PreferencesModelError.emptyRuleHeliumProfile(draft.id)
+                    AppLogger.error("Preferences rule \(draft.id) had an empty Chromium profile directory", category: .config)
+                    throw PreferencesModelError.emptyRuleChromiumProfile(draft.id)
                 }
-                return .applicationHeliumProfile(
+                return .applicationChromiumProfile(
                     bundleID: bundleID,
                     applicationURL: resolvedApplicationURL,
                     profileDirectory: trimmedProfileDirectory
@@ -611,9 +611,9 @@ final class PreferencesModel {
         switch compatibility {
         case .plainOnly:
             return .plain
-        case .heliumProfile:
+        case .chromiumProfile:
             switch route {
-            case .plain, .heliumProfile:
+            case .plain, .chromiumProfile:
                 return route
             case .firefoxProfile, .zenContainer:
                 return .plain
@@ -622,14 +622,14 @@ final class PreferencesModel {
             switch route {
             case .plain, .firefoxProfile:
                 return route
-            case .heliumProfile, .zenContainer:
+            case .chromiumProfile, .zenContainer:
                 return .plain
             }
         case .zenContainer:
             switch route {
             case .plain, .zenContainer:
                 return route
-            case .heliumProfile, .firefoxProfile:
+            case .chromiumProfile, .firefoxProfile:
                 return .plain
             }
         }

@@ -4,8 +4,8 @@ import Foundation
 /// (Helium Chromium profiles, Firefox-family profiles, or Zen containers).
 enum BrowserProfileRouteSelectionMode: Equatable {
     case none
-    case browserHeliumProfile
-    case defaultHeliumProfile
+    case browserChromiumProfile
+    case defaultChromiumProfile
     case browserFirefoxProfile
     case defaultFirefoxProfile
     case browserZenContainer
@@ -27,13 +27,13 @@ enum BrowserProfileRouteSelectionMode: Equatable {
     /// Default browser card: only the configured browser bundle ID matters.
     static func mode(forDefaultBrowserBundleID bundleID: String) -> BrowserProfileRouteSelectionMode {
         switch mode(forBrowserBundleID: bundleID) {
-        case .browserHeliumProfile:
-            return .defaultHeliumProfile
+        case .browserChromiumProfile:
+            return .defaultChromiumProfile
         case .browserFirefoxProfile:
             return .defaultFirefoxProfile
         case .browserZenContainer:
             return .defaultZenContainer
-        case .none, .defaultHeliumProfile, .defaultFirefoxProfile, .defaultZenContainer:
+        case .none, .defaultChromiumProfile, .defaultFirefoxProfile, .defaultZenContainer:
             return .none
         }
     }
@@ -42,8 +42,8 @@ enum BrowserProfileRouteSelectionMode: Equatable {
         switch DefaultBrowserProfileSupport.forBundleID(bundleID) {
         case .plainOnly:
             return .none
-        case .heliumProfile:
-            return .browserHeliumProfile
+        case .chromiumProfile:
+            return .browserChromiumProfile
         case .firefoxProfile:
             return .browserFirefoxProfile
         case .zenContainer:
@@ -55,14 +55,14 @@ enum BrowserProfileRouteSelectionMode: Equatable {
         switch self {
         case .browserZenContainer, .defaultZenContainer:
             return "Container"
-        case .none, .browserHeliumProfile, .defaultHeliumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
+        case .none, .browserChromiumProfile, .defaultChromiumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
             return "Profile"
         }
     }
 
     var emptyMessage: String {
         switch self {
-        case .browserHeliumProfile, .defaultHeliumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
+        case .browserChromiumProfile, .defaultChromiumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
             return "No profiles were found."
         case .browserZenContainer, .defaultZenContainer:
             return "No containers were found."
@@ -73,7 +73,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var readFailurePrefix: String {
         switch self {
-        case .browserHeliumProfile, .defaultHeliumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
+        case .browserChromiumProfile, .defaultChromiumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
             return "Could not read profiles"
         case .browserZenContainer, .defaultZenContainer:
             return "Could not read containers"
@@ -84,7 +84,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var includesBrowserDefaultCard: Bool {
         switch self {
-        case .browserHeliumProfile, .defaultHeliumProfile, .browserFirefoxProfile, .defaultFirefoxProfile, .browserZenContainer, .defaultZenContainer:
+        case .browserChromiumProfile, .defaultChromiumProfile, .browserFirefoxProfile, .defaultFirefoxProfile, .browserZenContainer, .defaultZenContainer:
             return true
         case .none:
             return false
@@ -97,7 +97,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
         switch mode {
         case .browserZenContainer, .defaultZenContainer:
             displayName = "No Container"
-        case .browserHeliumProfile, .defaultHeliumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
+        case .browserChromiumProfile, .defaultChromiumProfile, .browserFirefoxProfile, .defaultFirefoxProfile:
             displayName = "No Profile"
         case .none:
             displayName = "Default Browser"
@@ -126,8 +126,8 @@ enum BrowserProfileRoutePicker {
         switch mode {
         case .none:
             return BrowserProfileCardLoadResult(displayedProfiles: [], errorMessage: nil, logContext: "none")
-        case .browserHeliumProfile, .defaultHeliumProfile:
-            logContext = mode == .defaultHeliumProfile ? "Chromium default-browser profile row" : "Chromium browser rule profile row"
+        case .browserChromiumProfile, .defaultChromiumProfile:
+            logContext = mode == .defaultChromiumProfile ? "Chromium default-browser profile row" : "Chromium browser rule profile row"
             let factory = BrowserProfileDiscoveryFactory()
             guard let discoverer = factory.makeDiscoverer(forBundleID: browserBundleID) else {
                 AppLogger.error(

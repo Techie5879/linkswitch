@@ -15,7 +15,7 @@ protocol ProcessRunning {
 }
 
 enum BrowserLauncherError: Error, Equatable {
-    case unsupportedDefaultBrowserHeliumProfile(bundleID: String)
+    case unsupportedDefaultBrowserChromiumProfile(bundleID: String)
     case unsupportedDefaultBrowserProfile(bundleID: String)
     case unsupportedDefaultBrowserContainer(bundleID: String)
 }
@@ -61,16 +61,16 @@ struct BrowserLauncher {
                 applicationURL: config.defaultBrowserAppURL,
                 logLabel: "default browser"
             )
-        case let .defaultBrowserHeliumProfile(profileDirectory):
-            guard DefaultBrowserProfileSupport.forBundleID(config.defaultBrowserBundleID) == .heliumProfile else {
+        case let .defaultBrowserChromiumProfile(profileDirectory):
+            guard DefaultBrowserProfileSupport.forBundleID(config.defaultBrowserBundleID) == .chromiumProfile else {
                 AppLogger.error(
-                    "Default browser bundle ID \(config.defaultBrowserBundleID) does not support Helium profile routing",
+                    "Default browser bundle ID \(config.defaultBrowserBundleID) does not support Chromium profile routing",
                     category: .launch
                 )
-                throw BrowserLauncherError.unsupportedDefaultBrowserHeliumProfile(bundleID: config.defaultBrowserBundleID)
+                throw BrowserLauncherError.unsupportedDefaultBrowserChromiumProfile(bundleID: config.defaultBrowserBundleID)
             }
 
-            try await launchHeliumApplication(
+            try await launchChromiumApplication(
                 url: url,
                 bundleID: config.defaultBrowserBundleID,
                 applicationURL: config.defaultBrowserAppURL,
@@ -115,16 +115,16 @@ struct BrowserLauncher {
                 applicationURL: applicationURL,
                 logLabel: "browser rule"
             )
-        case let .applicationHeliumProfile(bundleID, applicationURL, profileDirectory):
-            guard DefaultBrowserProfileSupport.forBundleID(bundleID) == .heliumProfile else {
+        case let .applicationChromiumProfile(bundleID, applicationURL, profileDirectory):
+            guard DefaultBrowserProfileSupport.forBundleID(bundleID) == .chromiumProfile else {
                 AppLogger.error(
-                    "Browser rule bundle ID \(bundleID) does not support Helium profile routing",
+                    "Browser rule bundle ID \(bundleID) does not support Chromium profile routing",
                     category: .launch
                 )
-                throw BrowserLauncherError.unsupportedDefaultBrowserHeliumProfile(bundleID: bundleID)
+                throw BrowserLauncherError.unsupportedDefaultBrowserChromiumProfile(bundleID: bundleID)
             }
 
-            try await launchHeliumApplication(
+            try await launchChromiumApplication(
                 url: url,
                 bundleID: bundleID,
                 applicationURL: applicationURL,
@@ -164,7 +164,7 @@ struct BrowserLauncher {
             )
         case let .helium(profileDirectory):
             let applicationURL = try launchServicesBridge.applicationURL(forBundleIdentifier: Self.heliumBundleID)
-            try await launchHeliumApplication(
+            try await launchChromiumApplication(
                 url: url,
                 bundleID: Self.heliumBundleID,
                 applicationURL: applicationURL,
@@ -187,16 +187,16 @@ struct BrowserLauncher {
         try await workspaceLauncher.openURLs([url], withApplicationAt: applicationURL)
     }
 
-    private func launchHeliumApplication(
+    private func launchChromiumApplication(
         url: URL,
         bundleID: String,
         applicationURL: URL,
         profileDirectory: String,
         logLabel: String
     ) async throws {
-        let arguments = try HeliumLaunchArguments.make(url: url, profileDirectory: profileDirectory)
+        let arguments = try ChromiumLaunchArguments.make(url: url, profileDirectory: profileDirectory)
         AppLogger.info(
-            "Routing URL \(url.absoluteString) to \(logLabel) \(bundleID) at \(applicationURL.path()) with Helium profile arguments \(arguments)",
+            "Routing URL \(url.absoluteString) to \(logLabel) \(bundleID) at \(applicationURL.path()) with Chromium profile arguments \(arguments)",
             category: .launch
         )
         try await workspaceLauncher.launchApplicationExecutable(at: applicationURL, arguments: arguments)

@@ -52,7 +52,7 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
-    func testOpenDefaultBrowserHeliumProfileLaunchesConfiguredDefaultBrowserAppWithProfileArguments() async throws {
+    func testOpenDefaultBrowserChromiumProfileLaunchesConfiguredDefaultBrowserAppWithProfileArguments() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
@@ -68,7 +68,7 @@ final class BrowserLauncherTests: XCTestCase {
 
         try await launcher.open(
             url,
-            target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+            target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
             config: config
         )
 
@@ -87,7 +87,7 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
-    func testOpenDefaultBrowserHeliumProfileLaunchesChromeWithProfileArguments() async throws {
+    func testOpenDefaultBrowserChromiumProfileLaunchesChromeWithProfileArguments() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
@@ -103,7 +103,7 @@ final class BrowserLauncherTests: XCTestCase {
 
         try await launcher.open(
             url,
-            target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+            target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
             config: config
         )
 
@@ -156,7 +156,7 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
-    func testOpenDirectHeliumProfileLaunchesSelectedApplicationWithProfileArguments() async throws {
+    func testOpenDirectChromiumProfileLaunchesSelectedApplicationWithProfileArguments() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
@@ -167,7 +167,7 @@ final class BrowserLauncherTests: XCTestCase {
 
         try await launcher.open(
             url,
-            target: .applicationHeliumProfile(
+            target: .applicationChromiumProfile(
                 bundleID: BrowserLauncher.heliumBundleID,
                 applicationURL: heliumApplicationURL,
                 profileDirectory: "Profile 1"
@@ -201,7 +201,7 @@ final class BrowserLauncherTests: XCTestCase {
 
         try await launcher.open(
             url,
-            target: .applicationHeliumProfile(
+            target: .applicationChromiumProfile(
                 bundleID: "com.google.Chrome",
                 applicationURL: chromeApplicationURL,
                 profileDirectory: "Profile 1"
@@ -315,7 +315,7 @@ final class BrowserLauncherTests: XCTestCase {
         }
     }
 
-    func testOpenDefaultBrowserHeliumProfileThrowsForUnsupportedDefaultBrowserBundleID() async {
+    func testOpenDefaultBrowserChromiumProfileThrowsForUnsupportedDefaultBrowserBundleID() async {
         let launcher = BrowserLauncher(
             launchServicesBridge: makeBridge(),
             workspaceLauncher: WorkspaceLaunchSpy()
@@ -330,14 +330,14 @@ final class BrowserLauncherTests: XCTestCase {
         do {
             try await launcher.open(
                 URL(string: "https://example.com/helium")!,
-                target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+                target: .defaultBrowserChromiumProfile(profileDirectory: "Profile 1"),
                 config: config
             )
             XCTFail("Expected open to throw")
         } catch {
             XCTAssertEqual(
                 error as? BrowserLauncherError,
-                .unsupportedDefaultBrowserHeliumProfile(bundleID: "com.apple.Safari")
+                .unsupportedDefaultBrowserChromiumProfile(bundleID: "com.apple.Safari")
             )
         }
     }

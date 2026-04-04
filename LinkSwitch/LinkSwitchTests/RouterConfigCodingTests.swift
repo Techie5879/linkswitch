@@ -59,11 +59,11 @@ final class RouterConfigCodingTests: XCTestCase {
         XCTAssertEqual(decoded, config)
     }
 
-    func testRoundTripSupportsDefaultHeliumProfileRoute() throws {
+    func testRoundTripSupportsDefaultChromiumProfileRoute() throws {
         let config = RouterConfig(
             defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
             defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-            defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
             rules: []
         )
 
@@ -71,6 +71,54 @@ final class RouterConfigCodingTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RouterConfig.self, from: data)
 
         XCTAssertEqual(decoded, config)
+    }
+
+    func testDecodeMigratesLegacyHeliumProfileKeysToChromiumProfileKeys() throws {
+        let legacyJSONString = """
+        {
+          "defaultBrowserAppURL" : "file:///Applications/Google%20Chrome.app/",
+          "defaultBrowserBundleID" : "com.google.Chrome",
+          "defaultBrowserRoute" : {
+            "heliumProfile" : {
+              "profileDirectory" : "Profile 1"
+            }
+          },
+          "rules" : [
+            {
+              "id" : "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+              "sourceBundleID" : "com.apple.mail",
+              "target" : {
+                "applicationHeliumProfile" : {
+                  "applicationURL" : "file:///Applications/Google%20Chrome.app/",
+                  "bundleID" : "com.google.Chrome",
+                  "profileDirectory" : "Profile 2"
+                }
+              }
+            }
+          ]
+        }
+        """
+        let decoded = try JSONDecoder().decode(RouterConfig.self, from: Data(legacyJSONString.utf8))
+
+        XCTAssertEqual(
+            decoded,
+            RouterConfig(
+                defaultBrowserBundleID: "com.google.Chrome",
+                defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Google Chrome.app"),
+                defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
+                rules: [
+                    SourceAppRule(
+                        id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                        sourceBundleID: "com.apple.mail",
+                        target: .applicationChromiumProfile(
+                            bundleID: "com.google.Chrome",
+                            applicationURL: URL(fileURLWithPath: "/Applications/Google Chrome.app"),
+                            profileDirectory: "Profile 2"
+                        )
+                    ),
+                ]
+            )
+        )
     }
 
     func testDecodeThrowsWhenDefaultBrowserRouteKeyMissing() throws {

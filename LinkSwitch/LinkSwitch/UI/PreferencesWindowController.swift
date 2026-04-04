@@ -749,7 +749,7 @@ final class PreferencesViewController: NSViewController {
         switch model.defaultBrowserRoute {
         case .plain:
             return ""
-        case let .heliumProfile(profileDirectory):
+        case let .chromiumProfile(profileDirectory):
             return profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         case let .firefoxProfile(profileKey):
             return profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -792,13 +792,13 @@ final class PreferencesViewController: NSViewController {
         let mode = BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: model.defaultBrowserBundleID)
         let route: DefaultBrowserRoute
         switch mode {
-        case .defaultHeliumProfile:
-            route = profile.profileKey.isEmpty ? .plain : .heliumProfile(profileDirectory: profile.profileKey)
+        case .defaultChromiumProfile:
+            route = profile.profileKey.isEmpty ? .plain : .chromiumProfile(profileDirectory: profile.profileKey)
         case .defaultFirefoxProfile:
             route = profile.profileKey.isEmpty ? .plain : .firefoxProfile(profileKey: profile.profileKey)
         case .defaultZenContainer:
             route = profile.profileKey.isEmpty ? .plain : .zenContainer(containerName: profile.profileKey)
-        case .none, .browserHeliumProfile, .browserFirefoxProfile, .browserZenContainer:
+        case .none, .browserChromiumProfile, .browserFirefoxProfile, .browserZenContainer:
             return
         }
         model.updateDefaultBrowserRoute(route)
@@ -1179,7 +1179,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         switch draft.browserRoute {
         case .plain:
             currentSelectionKey = ""
-        case let .heliumProfile(profileDirectory):
+        case let .chromiumProfile(profileDirectory):
             currentSelectionKey = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         case let .firefoxProfile(profileKey):
             currentSelectionKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1636,10 +1636,10 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         let profile = discoveredProfiles[sender.tag]
         currentSelectionKey = profile.profileKey
         switch profileRouteSelectionMode() {
-        case .browserHeliumProfile, .defaultHeliumProfile:
+        case .browserChromiumProfile, .defaultChromiumProfile:
             let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
-                : .heliumProfile(profileDirectory: profile.profileKey)
+                : .chromiumProfile(profileDirectory: profile.profileKey)
             onBrowserRouteChange(route)
         case .browserFirefoxProfile, .defaultFirefoxProfile:
             let route: DefaultBrowserRoute = profile.profileKey.isEmpty

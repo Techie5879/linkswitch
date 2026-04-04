@@ -87,7 +87,7 @@ final class RuleEngineTests: XCTestCase {
         )
     }
 
-    func testUnknownSourceUsesConfiguredDefaultBrowserHeliumProfile() {
+    func testUnknownSourceUsesConfiguredDefaultBrowserChromiumProfile() {
         let context = IncomingOpenContext(
             url: URL(string: "https://example.com")!,
             sourceBundleID: "com.apple.mail"
@@ -95,13 +95,13 @@ final class RuleEngineTests: XCTestCase {
         let config = RouterConfig(
             defaultBrowserBundleID: BrowserLauncher.heliumBundleID,
             defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Helium.app"),
-            defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 1"),
+            defaultBrowserRoute: .chromiumProfile(profileDirectory: "Profile 1"),
             rules: []
         )
 
         XCTAssertEqual(
             ruleEngine.target(for: context, config: config),
-            .defaultBrowserHeliumProfile(profileDirectory: "Profile 1")
+            .defaultBrowserChromiumProfile(profileDirectory: "Profile 1")
         )
     }
 

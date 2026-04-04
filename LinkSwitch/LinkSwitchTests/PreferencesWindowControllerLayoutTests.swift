@@ -13,12 +13,20 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    target: .helium(profileDirectory: "Aritra")
+                    target: .applicationChromiumProfile(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                        profileDirectory: "Aritra"
+                    )
                 ),
                 SourceAppRule(
                     id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
                     sourceBundleID: "notion.id",
-                    target: .helium(profileDirectory: "Brighterway")
+                    target: .applicationChromiumProfile(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                        profileDirectory: "Brighterway"
+                    )
                 ),
             ]
         )

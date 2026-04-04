@@ -5,14 +5,14 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
     func testDefaultBrowserModeUsesDefaultHeliumProfileForHeliumBundleID() {
         XCTAssertEqual(
             BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: BrowserLauncher.heliumBundleID),
-            .defaultHeliumProfile
+            .defaultChromiumProfile
         )
     }
 
     func testDefaultBrowserModeUsesDefaultHeliumProfileForChromeBundleID() {
         XCTAssertEqual(
             BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: "com.google.Chrome"),
-            .defaultHeliumProfile
+            .defaultChromiumProfile
         )
     }
 
@@ -22,7 +22,7 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
                 targetSelection: .defaultBrowser,
                 defaultBrowserBundleID: BrowserLauncher.heliumBundleID
             ),
-            .defaultHeliumProfile
+            .defaultChromiumProfile
         )
     }
 
@@ -48,12 +48,12 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
                 ),
                 defaultBrowserBundleID: "com.apple.Safari"
             ),
-            .browserHeliumProfile
+            .browserChromiumProfile
         )
     }
 
     func testDefaultHeliumProfileModeIncludesBrowserDefaultCard() {
-        XCTAssertTrue(BrowserProfileRouteSelectionMode.defaultHeliumProfile.includesBrowserDefaultCard)
+        XCTAssertTrue(BrowserProfileRouteSelectionMode.defaultChromiumProfile.includesBrowserDefaultCard)
     }
 
     func testDefaultZenContainerModeUsesNoContainerPlainRouteCardLabel() {
