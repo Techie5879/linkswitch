@@ -2,7 +2,9 @@
 
 **Route links to the right browser, automatically.**
 
-Didn't wanna pay for Velja - so made my own equivalent.
+Didn't wanna pay for Velja - so made my own equivalent. Added decent support for all Chromium-like browsers, and specifically tested for Helium, Google Chrome, Zen -- as those are the ones that I use. If you don't find your browser's profiles supported - feel free to fork and add a PR. 
+
+Discovers all browsers on your mac, and allows you to route to any using the URL picker. A menubar native app, so it doesn't bloat your dock. Configurable as much as you need for this specific task - no other batteries included.
 
 LinkSwitch is a native macOS URL handler that intercepts `http` and `https` links and opens them in the browser of your choosing — based on which app opened the link. Send Slack links to your work browser profile, let everything else go to your personal default. No manual copy-paste, no chooser popup.
 
