@@ -78,7 +78,7 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
         }
     }
 
-    func testRuleTargetBrowserPopupListsDiscoveredBrowsersWithoutMenuIcons() throws {
+    func testRuleTargetBrowserPopupListsDiscoveredBrowsersWithMenuIcons() throws {
         let config = RouterConfig(
             defaultBrowserBundleID: "com.apple.Safari",
             defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
@@ -119,7 +119,51 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
             menuItems.map(\.title),
             ["Default Browser", "", "Google Chrome", "Helium", "Safari", "Zen"]
         )
-        XCTAssertTrue(menuItems.filter { !$0.isSeparatorItem }.allSatisfy { $0.image == nil })
+        XCTAssertTrue(menuItems.filter { !$0.isSeparatorItem }.allSatisfy { $0.image != nil })
+    }
+
+    func testRuleTargetBrowserPopupSelectsFirstDiscoveredBrowserInsteadOfSeparator() throws {
+        let config = RouterConfig(
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "notion.id",
+                    target: .application(
+                        bundleID: "com.google.Chrome",
+                        applicationURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")
+                    )
+                ),
+            ]
+        )
+        let controller = try makeController(
+            config: config,
+            browsers: [
+                DiscoveredBrowser(bundleID: "com.google.Chrome", name: "Google Chrome", appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")),
+                DiscoveredBrowser(bundleID: BrowserLauncher.heliumBundleID, name: "Helium", appURL: URL(fileURLWithPath: "/Applications/Helium.app")),
+            ],
+            applications: [
+                DiscoveredApplication(
+                    bundleID: "notion.id",
+                    name: "Notion",
+                    appURL: URL(fileURLWithPath: "/Applications/Notion.app")
+                ),
+            ]
+        )
+
+        let popup = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSPopUpButton }
+                .first { $0.accessibilityIdentifier() == "preferences.rule.targetBrowserPopup" }
+        )
+        let selectedItem = try XCTUnwrap(popup.selectedItem)
+
+        XCTAssertFalse(selectedItem.isSeparatorItem)
+        XCTAssertEqual(selectedItem.title, "Google Chrome")
+        XCTAssertNotNil(selectedItem.image)
+        XCTAssertEqual(popup.titleOfSelectedItem, "Google Chrome")
     }
 
     private func makeController(

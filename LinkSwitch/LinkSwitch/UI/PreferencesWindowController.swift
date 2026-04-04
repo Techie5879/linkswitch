@@ -1111,6 +1111,11 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private enum TargetPopupTag {
         static let defaultBrowser = -995
         static let customBrowser = -994
+        static let discoveredBrowserBase = 1_000
+
+        static func discoveredBrowserTag(for index: Int) -> Int {
+            discoveredBrowserBase + index
+        }
     }
 
     private let sourceAppPopUpButton: NSPopUpButton
@@ -1300,8 +1305,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         targetBrowserPopupButton.removeAllItems()
         guard let menu = targetBrowserPopupButton.menu else { return }
 
-        let defaultItem = NSMenuItem(title: "Default Browser", action: nil, keyEquivalent: "")
-        defaultItem.tag = TargetPopupTag.defaultBrowser
+        let defaultIcon = defaultBrowserAppURL.map(iconProvider.icon(forAppURL:)) ?? (NSImage(named: NSImage.applicationIconName) ?? NSImage())
+        let defaultItem = Self.makeMenuItem(title: "Default Browser", icon: defaultIcon, tag: TargetPopupTag.defaultBrowser)
         menu.addItem(defaultItem)
 
         let selectedBundleID = currentTargetSelection.bundleID
@@ -1310,12 +1315,17 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         }
 
         if let selectedBundleID, matchIndex == nil {
-            let customItem = NSMenuItem(
+            let customIcon: NSImage
+            if let applicationURL = currentTargetSelection.applicationURL {
+                customIcon = iconProvider.icon(forAppURL: applicationURL)
+            } else {
+                customIcon = iconProvider.icon(forBundleID: selectedBundleID)
+            }
+            let customItem = Self.makeMenuItem(
                 title: "Current: \(targetDisplayName(forBundleID: selectedBundleID, applicationURL: currentTargetSelection.applicationURL))",
-                action: nil,
-                keyEquivalent: ""
+                icon: customIcon,
+                tag: TargetPopupTag.customBrowser
             )
-            customItem.tag = TargetPopupTag.customBrowser
             menu.addItem(customItem)
         }
 
@@ -1324,8 +1334,11 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         }
 
         for (index, browser) in discoveredBrowsers.enumerated() {
-            let item = NSMenuItem(title: browser.name, action: nil, keyEquivalent: "")
-            item.tag = index
+            let item = Self.makeMenuItem(
+                title: browser.name,
+                icon: iconProvider.icon(forAppURL: browser.appURL),
+                tag: TargetPopupTag.discoveredBrowserTag(for: index)
+            )
             menu.addItem(item)
         }
 
@@ -1334,7 +1347,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             targetBrowserPopupButton.selectItem(withTag: TargetPopupTag.defaultBrowser)
         case .browser:
             if let matchIndex {
-                targetBrowserPopupButton.selectItem(withTag: matchIndex)
+                targetBrowserPopupButton.selectItem(withTag: TargetPopupTag.discoveredBrowserTag(for: matchIndex))
             } else {
                 targetBrowserPopupButton.selectItem(withTag: TargetPopupTag.customBrowser)
             }
@@ -1499,8 +1512,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         if tag == TargetPopupTag.customBrowser {
             return currentTargetSelection
         }
-        if tag >= 0, tag < discoveredBrowsers.count {
-            let browser = discoveredBrowsers[tag]
+        if tag >= TargetPopupTag.discoveredBrowserBase {
+            let browserIndex = tag - TargetPopupTag.discoveredBrowserBase
+            guard browserIndex >= 0, browserIndex < discoveredBrowsers.count else {
+                return currentTargetSelection
+            }
+            let browser = discoveredBrowsers[browserIndex]
             return .browser(bundleID: browser.bundleID, applicationURL: browser.appURL)
         }
         return currentTargetSelection
