@@ -1114,27 +1114,9 @@ final class PreferencesViewController: NSViewController {
         AppLogger.info("User toggled Open at Login to \(shouldEnable)", category: .app)
 
         do {
-            let updatedStatus = try model.setLaunchAtLoginEnabled(shouldEnable)
+            _ = try model.setLaunchAtLoginEnabled(shouldEnable)
             refreshOpenAtLoginDisplay()
-
-            switch (shouldEnable, updatedStatus) {
-            case (true, .enabled):
-                setStatus("LinkSwitch will now open automatically when you log in.", style: .success)
-            case (true, .requiresApproval):
-                setStatus("Approve LinkSwitch in Login Items to finish enabling Open at Login.", style: .warning)
-            case (true, .notFound):
-                setStatus("Could not finish enabling Open at Login for this app bundle.", style: .error)
-            case (true, .unsupported):
-                setStatus("macOS reported an unsupported Login Items state.", style: .error)
-            case (true, .notRegistered):
-                setStatus("LinkSwitch is still not registered to open at login.", style: .warning)
-            case (false, .notRegistered), (false, .notFound):
-                setStatus("LinkSwitch will no longer open automatically when you log in.")
-            case (false, .unsupported):
-                setStatus("macOS reported an unsupported Login Items state.", style: .error)
-            case (false, .enabled), (false, .requiresApproval):
-                setStatus("LinkSwitch is still present in Login Items.", style: .warning)
-            }
+            clearStatus()
         } catch {
             refreshOpenAtLoginDisplay()
             presentPreferencesError(
@@ -1148,7 +1130,7 @@ final class PreferencesViewController: NSViewController {
 
     @objc private func openLoginItemsSettings(_ sender: Any?) {
         model.openSystemSettingsLoginItems()
-        setStatus("Opened System Settings to Login Items.")
+        clearStatus()
     }
 
     private func testRule(id: UUID) {
@@ -1181,6 +1163,11 @@ final class PreferencesViewController: NSViewController {
         case .error:
             statusLabel.textColor = .systemRed
         }
+    }
+
+    private func clearStatus() {
+        statusLabel.stringValue = ""
+        statusLabel.textColor = .secondaryLabelColor
     }
 
     private func presentPreferencesError(_ error: Error, message: String) {
