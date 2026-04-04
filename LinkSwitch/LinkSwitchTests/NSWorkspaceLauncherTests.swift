@@ -3,13 +3,11 @@ import XCTest
 
 @MainActor
 final class NSWorkspaceLauncherTests: XCTestCase {
-    func testLaunchApplicationExecutableRunsBundleExecutableAndActivatesProcess() async throws {
+    func testLaunchApplicationExecutableRunsBundleExecutableWithoutManualBundleActivation() async throws {
         let applicationURL = URL(fileURLWithPath: "/Applications/Helium.app")
         let processRunner = ProcessRunnerSpy(processIdentifier: 4242)
-        let activator = RunningApplicationActivatorSpy()
         let launcher = NSWorkspaceLauncher(
-            processRunner: processRunner,
-            runningApplicationActivator: activator
+            processRunner: processRunner
         )
 
         try await launcher.launchApplicationExecutable(
@@ -20,7 +18,6 @@ final class NSWorkspaceLauncherTests: XCTestCase {
         XCTAssertEqual(processRunner.calls.count, 1)
         XCTAssertEqual(processRunner.calls.first?.executableURL.path, "/Applications/Helium.app/Contents/MacOS/Helium")
         XCTAssertEqual(processRunner.calls.first?.arguments, ["--profile-directory=Profile 1", "https://example.com"])
-        XCTAssertEqual(activator.activatedBundleIdentifiers, ["net.imput.helium"])
     }
 }
 
@@ -40,13 +37,5 @@ private final class ProcessRunnerSpy: ProcessRunning {
     func run(executableURL: URL, arguments: [String]) throws -> pid_t {
         calls.append(Call(executableURL: executableURL, arguments: arguments))
         return processIdentifier
-    }
-}
-
-private final class RunningApplicationActivatorSpy: RunningApplicationActivating {
-    private(set) var activatedBundleIdentifiers: [String] = []
-
-    func activate(bundleIdentifier: String) async throws {
-        activatedBundleIdentifiers.append(bundleIdentifier)
     }
 }

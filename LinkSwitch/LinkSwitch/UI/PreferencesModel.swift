@@ -33,6 +33,39 @@ enum PreferencesModelError: Error, Equatable {
     case emptyHeliumProfileDirectory(UUID)
 }
 
+extension PreferencesModelError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingFallbackBrowserSelection:
+            return "Select a fallback browser before saving."
+        case let .fallbackBrowserBundleIdentifierNotFound(applicationURL):
+            return "The selected fallback browser at \(applicationURL.path()) does not expose a bundle identifier."
+        case let .linkSwitchBundleIdentifierNotFound(applicationURL):
+            return "The LinkSwitch app at \(applicationURL.path()) does not expose a bundle identifier."
+        case let .invalidSampleURL(urlString):
+            return "The sample URL '\(urlString)' is not valid."
+        case let .ruleNotFound(ruleID):
+            return "The selected rule \(ruleID.uuidString) no longer exists."
+        case let .emptySourceBundleID(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a source app bundle ID."
+        case let .emptyFallbackBrowserHeliumProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a fallback Helium profile."
+        case let .emptyFallbackBrowserFirefoxProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a fallback Firefox profile."
+        case let .emptyFallbackBrowserZenContainer(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a Zen container."
+        case .emptyFallbackBrowserDefaultHeliumProfile:
+            return "The default fallback browser route is missing a Helium profile."
+        case .emptyFallbackBrowserDefaultFirefoxProfile:
+            return "The default fallback browser route is missing a Firefox profile."
+        case .emptyFallbackBrowserDefaultZenContainer:
+            return "The default fallback browser route is missing a Zen container."
+        case let .emptyHeliumProfileDirectory(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a Helium profile."
+        }
+    }
+}
+
 @MainActor
 final class PreferencesModel {
     private let configStore: any RouterConfigLoading & RouterConfigSaving
@@ -232,6 +265,27 @@ final class PreferencesModel {
         let config = try makeRouterConfig()
         AppLogger.info("Saving preferences model to \(configFileURLDescription)", category: .config)
         try configStore.save(config)
+    }
+
+    func configValidationMessage() -> String? {
+        do {
+            _ = try makeRouterConfig()
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    func rawConfigPreview() -> String {
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let config = try makeRouterConfig()
+            let data = try encoder.encode(config)
+            return String(decoding: data, as: UTF8.self)
+        } catch {
+            return "Config preview unavailable.\n\(error.localizedDescription)"
+        }
     }
 
     func testFallbackBrowser() async throws {

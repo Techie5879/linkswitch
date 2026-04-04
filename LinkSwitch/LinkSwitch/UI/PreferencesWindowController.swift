@@ -51,7 +51,7 @@ private final class ProfileCardButton: NSButton {
 
     override var intrinsicContentSize: NSSize {
         let base = super.intrinsicContentSize
-        return NSSize(width: base.width + 24, height: max(36, base.height + 14))
+        return NSSize(width: base.width + 20, height: max(28, base.height + 8))
     }
 
     override func updateLayer() {
@@ -121,8 +121,6 @@ final class PreferencesViewController: NSViewController {
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    private let fallbackBrowserNameLabel = NSTextField(labelWithString: "")
-    private let fallbackBrowserBundleLabel = NSTextField(labelWithString: "")
     private let fallbackBrowserPopup = NSPopUpButton()
 
     private let fallbackProfileSectionLabel = NSTextField(labelWithString: "Profile")
@@ -154,11 +152,27 @@ final class PreferencesViewController: NSViewController {
         accessibilityIdentifier: "preferences.setFallbackAsDefaultHandlerButton"
     )
 
+    private lazy var reloadButton: NSButton = makeButton(
+        title: "Reload",
+        action: #selector(reloadPreferences(_:)),
+        accessibilityIdentifier: "preferences.reloadButton"
+    )
+
+    private lazy var saveButton: NSButton = makeButton(
+        title: "Save",
+        action: #selector(savePreferences(_:)),
+        accessibilityIdentifier: "preferences.saveButton"
+    )
+
     // MARK: Misc controls
     private let configPathLabel = NSTextField(wrappingLabelWithString: "")
     private let sampleURLField = NSTextField(string: "")
     private let rulesStackView = NSStackView()
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
+    private let rawConfigValidationLabel = NSTextField(wrappingLabelWithString: "")
+    private let rawConfigScrollView = NSScrollView()
+    private let rawConfigTextView = NSTextView()
+    private var autoSaveTimer: Timer?
 
     // MARK: Init
 
@@ -246,8 +260,9 @@ final class PreferencesViewController: NSViewController {
 
         // Footer
         let footer = makeFooter()
+        let rawConfigCard = makeRawConfigCard()
 
-        let rootStack = NSStackView(views: [headerStack, topCardsRow, rulesSectionHeader, rulesStackView, footer])
+        let rootStack = NSStackView(views: [headerStack, topCardsRow, rulesSectionHeader, rulesStackView, footer, rawConfigCard])
         rootStack.translatesAutoresizingMaskIntoConstraints = false
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
@@ -259,6 +274,7 @@ final class PreferencesViewController: NSViewController {
             rulesSectionHeader.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             rulesStackView.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            rawConfigCard.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
         ])
 
         return rootStack
@@ -298,27 +314,9 @@ final class PreferencesViewController: NSViewController {
 
         let titleLabel = makeSectionLabel("Fallback Browser")
 
-        // 48×48 icon
         fallbackBrowserIconView.setContentHuggingPriority(.required, for: .horizontal)
         fallbackBrowserIconView.setContentHuggingPriority(.required, for: .vertical)
         fallbackBrowserIconView.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        fallbackBrowserNameLabel.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .medium)
-        fallbackBrowserNameLabel.lineBreakMode = .byTruncatingMiddle
-
-        fallbackBrowserBundleLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        fallbackBrowserBundleLabel.textColor = .secondaryLabelColor
-        fallbackBrowserBundleLabel.lineBreakMode = .byTruncatingMiddle
-
-        let nameStack = NSStackView(views: [fallbackBrowserNameLabel, fallbackBrowserBundleLabel])
-        nameStack.orientation = .vertical
-        nameStack.alignment = .leading
-        nameStack.spacing = 2
-
-        let browserInfoRow = NSStackView(views: [fallbackBrowserIconView, nameStack])
-        browserInfoRow.orientation = .horizontal
-        browserInfoRow.alignment = .centerY
-        browserInfoRow.spacing = 12
 
         fallbackBrowserPopup.target = self
         fallbackBrowserPopup.action = #selector(fallbackBrowserPopupChanged(_:))
@@ -330,8 +328,9 @@ final class PreferencesViewController: NSViewController {
             accessibilityIdentifier: "preferences.testFallbackBrowserButton"
         )
 
-        let actionsRow = NSStackView(views: [fallbackBrowserPopup, testButton])
+        let actionsRow = NSStackView(views: [fallbackBrowserIconView, fallbackBrowserPopup, testButton])
         actionsRow.orientation = .horizontal
+        actionsRow.alignment = .centerY
         actionsRow.spacing = 8
 
         fallbackProfileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
@@ -354,7 +353,7 @@ final class PreferencesViewController: NSViewController {
         fallbackProfileContainerView.addArrangedSubview(fallbackProfileDiscoveryErrorLabel)
         fallbackProfileContainerView.isHidden = true
 
-        let contentStack = NSStackView(views: [titleLabel, browserInfoRow, actionsRow, fallbackProfileContainerView])
+        let contentStack = NSStackView(views: [titleLabel, actionsRow, fallbackProfileContainerView])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
@@ -362,14 +361,14 @@ final class PreferencesViewController: NSViewController {
 
         card.addSubview(contentStack)
         NSLayoutConstraint.activate([
-            fallbackBrowserIconView.widthAnchor.constraint(equalToConstant: 48),
-            fallbackBrowserIconView.heightAnchor.constraint(equalToConstant: 48),
+            fallbackBrowserIconView.widthAnchor.constraint(equalToConstant: 24),
+            fallbackBrowserIconView.heightAnchor.constraint(equalToConstant: 24),
             contentStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
             contentStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
             contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
             contentStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
             fallbackBrowserPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
-            fallbackProfileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
+            fallbackProfileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
         ])
 
         return card
@@ -438,7 +437,7 @@ final class PreferencesViewController: NSViewController {
             accessibilityIdentifier: "preferences.addRuleButton"
         )
 
-        let row = NSStackView(views: [titleLabel, spacer, addButton])
+        let row = NSStackView(views: [titleLabel, spacer, reloadButton, saveButton, addButton])
         row.orientation = .horizontal
         row.alignment = .centerY
         row.spacing = 8
@@ -462,41 +461,68 @@ final class PreferencesViewController: NSViewController {
         urlRow.spacing = 8
         urlRow.distribution = .fill
 
-        let reloadButton = makeButton(
-            title: "Reload",
-            action: #selector(reloadPreferences(_:)),
-            accessibilityIdentifier: "preferences.reloadButton"
-        )
-        let saveButton = makeButton(
-            title: "Save",
-            action: #selector(savePreferences(_:)),
-            accessibilityIdentifier: "preferences.saveButton"
-        )
-
         statusLabel.maximumNumberOfLines = 0
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        let actionsRow = NSStackView(views: [reloadButton, saveButton, spacer, statusLabel])
-        actionsRow.orientation = .horizontal
-        actionsRow.alignment = .centerY
-        actionsRow.spacing = 12
-
-        let footer = NSStackView(views: [urlRow, actionsRow])
+        let footer = NSStackView(views: [urlRow, statusLabel])
         footer.orientation = .vertical
         footer.alignment = .leading
         footer.spacing = 12
 
-        // Both rows fill the footer width.
         NSLayoutConstraint.activate([
             urlRow.widthAnchor.constraint(equalTo: footer.widthAnchor),
-            actionsRow.widthAnchor.constraint(equalTo: footer.widthAnchor),
+            statusLabel.widthAnchor.constraint(equalTo: footer.widthAnchor),
         ])
 
         return footer
+    }
+
+    private func makeRawConfigCard() -> NSView {
+        let card = CardView()
+        card.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = makeSectionLabel("Raw Config")
+
+        rawConfigValidationLabel.maximumNumberOfLines = 0
+        rawConfigValidationLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+
+        rawConfigTextView.isEditable = false
+        rawConfigTextView.isSelectable = true
+        rawConfigTextView.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        rawConfigTextView.textColor = .textColor
+        rawConfigTextView.backgroundColor = .textBackgroundColor
+        rawConfigTextView.isVerticallyResizable = true
+        rawConfigTextView.isHorizontallyResizable = true
+        rawConfigTextView.autoresizingMask = [.width]
+        rawConfigTextView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        rawConfigTextView.textContainer?.widthTracksTextView = false
+        rawConfigTextView.setAccessibilityIdentifier("preferences.rawConfigTextView")
+
+        rawConfigScrollView.translatesAutoresizingMaskIntoConstraints = false
+        rawConfigScrollView.hasVerticalScroller = true
+        rawConfigScrollView.hasHorizontalScroller = true
+        rawConfigScrollView.autohidesScrollers = true
+        rawConfigScrollView.borderType = .bezelBorder
+        rawConfigScrollView.documentView = rawConfigTextView
+
+        let contentStack = NSStackView(views: [titleLabel, rawConfigValidationLabel, rawConfigScrollView])
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = 12
+
+        card.addSubview(contentStack)
+        NSLayoutConstraint.activate([
+            contentStack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
+            contentStack.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
+            contentStack.topAnchor.constraint(equalTo: card.topAnchor, constant: 16),
+            contentStack.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -16),
+            rawConfigValidationLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            rawConfigScrollView.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            rawConfigScrollView.heightAnchor.constraint(equalToConstant: 180),
+        ])
+
+        return card
     }
 
     // MARK: refreshUI
@@ -511,6 +537,48 @@ final class PreferencesViewController: NSViewController {
         refreshHandlerStatusDisplay()
 
         refreshRules()
+        refreshRawConfigPreview()
+    }
+
+    private func refreshRawConfigPreview() {
+        let validationMessage = model.configValidationMessage()
+        if let validationMessage {
+            rawConfigValidationLabel.stringValue = validationMessage
+            rawConfigValidationLabel.textColor = .systemOrange
+            saveButton.isEnabled = false
+        } else {
+            rawConfigValidationLabel.stringValue = "Config is valid. Changes save automatically."
+            rawConfigValidationLabel.textColor = .secondaryLabelColor
+            saveButton.isEnabled = true
+        }
+        rawConfigTextView.string = model.rawConfigPreview()
+    }
+
+    private func scheduleAutoSave() {
+        autoSaveTimer?.invalidate()
+        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.performAutoSave()
+            }
+        }
+    }
+
+    private func performAutoSave() {
+        refreshRawConfigPreview()
+        guard model.configValidationMessage() == nil else {
+            setStatus("Auto-save paused until the config is valid.", style: .warning)
+            return
+        }
+
+        do {
+            try model.save()
+            refreshRawConfigPreview()
+            setStatus("Saved automatically.")
+        } catch {
+            AppLogger.error("Auto-save failed: \(error.localizedDescription)", category: .app)
+            refreshRawConfigPreview()
+            setStatus("Auto-save failed: \(error.localizedDescription)", style: .error)
+        }
     }
 
     private func refreshHandlerStatusDisplay() {
@@ -561,20 +629,8 @@ final class PreferencesViewController: NSViewController {
     private func refreshFallbackBrowserDisplay() {
         if let appURL = model.fallbackBrowserAppURL {
             fallbackBrowserIconView.image = iconProvider.icon(forAppURL: appURL)
-            // Derive display name: try the discovered list first, then the bundle, then the filename.
-            if let discovered = model.discoveredBrowsers.first(where: { $0.bundleID == model.fallbackBrowserBundleID }) {
-                fallbackBrowserNameLabel.stringValue = discovered.name
-            } else if let name = Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-                        ?? Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleName") as? String {
-                fallbackBrowserNameLabel.stringValue = name
-            } else {
-                fallbackBrowserNameLabel.stringValue = appURL.deletingPathExtension().lastPathComponent
-            }
-            fallbackBrowserBundleLabel.stringValue = model.fallbackBrowserBundleID
         } else {
             fallbackBrowserIconView.image = NSImage(named: NSImage.applicationIconName)
-            fallbackBrowserNameLabel.stringValue = "No browser selected"
-            fallbackBrowserBundleLabel.stringValue = "Choose a fallback browser below"
         }
     }
 
@@ -710,6 +766,8 @@ final class PreferencesViewController: NSViewController {
         }
         model.updateFallbackBrowserRoute(route)
         applyFallbackProfileCardSelection()
+        refreshRawConfigPreview()
+        scheduleAutoSave()
         AppLogger.info(
             "Default fallback browser: selected card \(profile.displayName) key '\(profile.profileKey)' route \(route.description)",
             category: .app
@@ -739,6 +797,8 @@ final class PreferencesViewController: NSViewController {
                 fallbackBrowserAppURL: model.fallbackBrowserAppURL,
                 onSourceBundleIDChange: { [weak self] value in
                     self?.model.updateRuleSourceBundleID(id: draft.id, value: value)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
                 },
                 onSourcePickerNeedsUIRefresh: { [weak self] in
                     self?.refreshUI()
@@ -746,16 +806,22 @@ final class PreferencesViewController: NSViewController {
                 onTargetKindChange: { [weak self] targetKind in
                     self?.model.updateRuleTargetKind(id: draft.id, targetKind: targetKind)
                     self?.refreshUI()
+                    self?.scheduleAutoSave()
                 },
                 onFallbackBrowserRouteChange: { [weak self] route in
                     self?.model.updateRuleFallbackBrowserRoute(id: draft.id, route: route)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
                 },
                 onHeliumProfileDirectoryChange: { [weak self] value in
                     self?.model.updateRuleHeliumProfileDirectory(id: draft.id, value: value)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
                 },
                 onRemove: { [weak self] in
                     self?.model.removeRule(id: draft.id)
                     self?.refreshUI()
+                    self?.scheduleAutoSave()
                     self?.setStatus("Removed rule.")
                 },
                 onTest: { [weak self] in
@@ -783,6 +849,7 @@ final class PreferencesViewController: NSViewController {
             AppLogger.info("Fallback browser changed to \(browser.bundleID) via popup", category: .app)
             model.setFallbackBrowser(discoveredBrowser: browser)
             refreshUI()
+            scheduleAutoSave()
         }
     }
 
@@ -804,7 +871,7 @@ final class PreferencesViewController: NSViewController {
             do {
                 try self?.model.setFallbackBrowser(applicationURL: applicationURL)
                 self?.refreshUI()
-                self?.setStatus("Selected fallback browser at \(applicationURL.path()).")
+                self?.scheduleAutoSave()
             } catch {
                 self?.presentPreferencesError(error, message: "Could not use the selected browser app.")
             }
@@ -814,10 +881,12 @@ final class PreferencesViewController: NSViewController {
     @objc private func addRule(_ sender: Any?) {
         _ = model.addRule()
         refreshUI()
+        scheduleAutoSave()
         setStatus("Added new rule.")
     }
 
     @objc private func reloadPreferences(_ sender: Any?) {
+        autoSaveTimer?.invalidate()
         do {
             try model.load()
             iconProvider.clearCache()
@@ -829,11 +898,14 @@ final class PreferencesViewController: NSViewController {
     }
 
     @objc private func savePreferences(_ sender: Any?) {
+        autoSaveTimer?.invalidate()
         syncSampleURLField()
         do {
             try model.save()
+            refreshRawConfigPreview()
             setStatus("Saved router config to disk.")
         } catch {
+            refreshRawConfigPreview()
             presentPreferencesError(error, message: "Could not save the router config.")
         }
     }
@@ -935,12 +1007,12 @@ final class PreferencesViewController: NSViewController {
     }
 
     private func presentPreferencesError(_ error: Error, message: String) {
-        AppLogger.error("\(message) \(error)", category: .app)
+        AppLogger.error("\(message) \(error.localizedDescription)", category: .app)
         setStatus(message, style: .error)
 
         let alert = NSAlert()
         alert.messageText = message
-        alert.informativeText = String(describing: error)
+        alert.informativeText = error.localizedDescription
         alert.alertStyle = .warning
         if let hostWindow = view.window {
             alert.beginSheetModal(for: hostWindow)
@@ -1077,8 +1149,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         profileDiscoveryErrorLabel.textColor = .systemOrange
         profileDiscoveryErrorLabel.isHidden = true
 
-        sourceIconView = Self.makeIconView(size: 32)
-        targetIconView = Self.makeIconView(size: 32)
+        sourceIconView = Self.makeIconView(size: 24)
+        targetIconView = Self.makeIconView(size: 24)
 
         profileContainerView = NSStackView()
 
@@ -1193,18 +1265,12 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         sourcePickerRow.alignment = .centerY
         sourcePickerRow.spacing = 8
 
-        let sourceLabelRow = NSStackView(views: [NSTextField(labelWithString: "Source App")])
-        (sourceLabelRow.arrangedSubviews[0] as? NSTextField)?.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-        (sourceLabelRow.arrangedSubviews[0] as? NSTextField)?.textColor = .secondaryLabelColor
-
-        // Arrow (only on the picker row, aligned with icon + popup rows — not with section titles)
         let arrowLabel = NSTextField(labelWithString: "→")
-        arrowLabel.font = .systemFont(ofSize: 20, weight: .light)
+        arrowLabel.font = .systemFont(ofSize: 18, weight: .light)
         arrowLabel.textColor = .tertiaryLabelColor
         arrowLabel.setContentHuggingPriority(.required, for: .horizontal)
         arrowLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        // Target section: [icon] [popup button]
         targetKindPopupButton.addItems(withTitles: PreferencesRuleTargetKind.allCases.map(\.displayName))
         targetKindPopupButton.selectItem(at: draft.targetKind == .fallbackBrowser ? 0 : 1)
         targetKindPopupButton.target = self
@@ -1230,42 +1296,6 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         profileContainerView.addArrangedSubview(profileDiscoveryErrorLabel)
         profileContainerView.isHidden = true
 
-        let targetLabelRow = NSStackView(views: [NSTextField(labelWithString: "Routes To")])
-        (targetLabelRow.arrangedSubviews[0] as? NSTextField)?.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-        (targetLabelRow.arrangedSubviews[0] as? NSTextField)?.textColor = .secondaryLabelColor
-
-        // Three-row grid so labels sit above the arrow column and the arrow aligns with the picker row.
-        let arrowColumnWidth: CGFloat = 28
-        let arrowColumnTopSpacer = NSView()
-        arrowColumnTopSpacer.translatesAutoresizingMaskIntoConstraints = false
-        let arrowColumnBottomSpacer = NSView()
-        arrowColumnBottomSpacer.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            arrowColumnTopSpacer.widthAnchor.constraint(equalToConstant: arrowColumnWidth),
-            arrowColumnBottomSpacer.widthAnchor.constraint(equalToConstant: arrowColumnWidth),
-        ])
-
-        let labelsRow = NSStackView(views: [sourceLabelRow, arrowColumnTopSpacer, targetLabelRow])
-        labelsRow.orientation = .horizontal
-        labelsRow.alignment = .centerY
-        labelsRow.spacing = 16
-
-        let pickerRow = NSStackView(views: [sourcePickerRow, arrowLabel, targetPickerRow])
-        pickerRow.orientation = .horizontal
-        pickerRow.alignment = .centerY
-        pickerRow.spacing = 16
-
-        let bottomRow = NSStackView(views: [manualBundleIDStack, arrowColumnBottomSpacer, profileContainerView])
-        bottomRow.orientation = .horizontal
-        bottomRow.alignment = .centerY
-        bottomRow.spacing = 16
-
-        let contentColumn = NSStackView(views: [labelsRow, pickerRow, bottomRow])
-        contentColumn.orientation = .vertical
-        contentColumn.alignment = .leading
-        contentColumn.spacing = 4
-
-        // Action buttons (right-aligned)
         let testButton = NSButton(title: "Test Rule", target: self, action: #selector(testRule(_:)))
         testButton.bezelStyle = .rounded
         testButton.setAccessibilityIdentifier("preferences.rule.testButton")
@@ -1274,43 +1304,42 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         removeButton.bezelStyle = .rounded
         removeButton.setAccessibilityIdentifier("preferences.rule.removeButton")
 
-        let buttonSpacer = NSView()
-        buttonSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let mainPickerStack = NSStackView(views: [sourcePickerRow, arrowLabel, targetPickerRow])
+        mainPickerStack.orientation = .horizontal
+        mainPickerStack.alignment = .centerY
+        mainPickerStack.spacing = 12
 
-        let buttonsRow = NSStackView(views: [buttonSpacer, testButton, removeButton])
-        buttonsRow.orientation = .horizontal
-        buttonsRow.alignment = .centerY
-        buttonsRow.spacing = 8
+        let rowSpacer = NSView()
+        rowSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let rootStack = NSStackView(views: [contentColumn, buttonsRow])
+        let topRow = NSStackView(views: [mainPickerStack, rowSpacer, testButton, removeButton])
+        topRow.orientation = .horizontal
+        topRow.alignment = .centerY
+        topRow.spacing = 8
+
+        let rootStack = NSStackView(views: [topRow, manualBundleIDStack, profileContainerView])
         rootStack.translatesAutoresizingMaskIntoConstraints = false
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
-        rootStack.spacing = 12
+        rootStack.spacing = 8
 
         addSubview(rootStack)
 
-        // Both rows fill the card width.
         NSLayoutConstraint.activate([
-            contentColumn.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
-            buttonsRow.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
-        ])
-        NSLayoutConstraint.activate([
-            sourceIconView.widthAnchor.constraint(equalToConstant: 32),
-            sourceIconView.heightAnchor.constraint(equalToConstant: 32),
-            targetIconView.widthAnchor.constraint(equalToConstant: 32),
-            targetIconView.heightAnchor.constraint(equalToConstant: 32),
-            sourceLabelRow.widthAnchor.constraint(equalTo: sourcePickerRow.widthAnchor),
-            targetLabelRow.widthAnchor.constraint(equalTo: targetPickerRow.widthAnchor),
-            sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 260),
-            targetKindPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            topRow.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            sourceIconView.widthAnchor.constraint(equalToConstant: 24),
+            sourceIconView.heightAnchor.constraint(equalToConstant: 24),
+            targetIconView.widthAnchor.constraint(equalToConstant: 24),
+            targetIconView.heightAnchor.constraint(equalToConstant: 24),
+            sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            targetKindPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
             manualBundleIDField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
-            profileCardsStack.widthAnchor.constraint(greaterThanOrEqualTo: targetPickerRow.widthAnchor),
-            profileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 36),
+            profileCardsStack.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            profileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
             rootStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
             rootStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            rootStack.topAnchor.constraint(equalTo: topAnchor, constant: 14),
-            rootStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
+            rootStack.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            rootStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
         ])
     }
 

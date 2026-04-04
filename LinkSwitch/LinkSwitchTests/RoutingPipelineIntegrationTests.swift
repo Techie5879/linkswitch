@@ -57,6 +57,83 @@ final class RoutingPipelineIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testSavedPreferencesConfigRoutesMultipleSavedSourceRulesToTheirTargets() async throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
+        let configStore = RouterConfigStore(configFileURL: configFileURL)
+        let preferencesModel = PreferencesModel(
+            configStore: configStore,
+            browserLauncher: RoutingPipelineBrowserLauncherSpy(),
+            configFileURLDescription: configFileURL.path()
+        )
+
+        preferencesModel.fallbackBrowserBundleID = "com.apple.Safari"
+        preferencesModel.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+
+        let slackRuleID = preferencesModel.addRule()
+        preferencesModel.updateRuleSourceBundleID(id: slackRuleID, value: "com.tinyspeck.slackmacgap")
+        preferencesModel.updateRuleTargetKind(id: slackRuleID, targetKind: .helium)
+        preferencesModel.updateRuleHeliumProfileDirectory(id: slackRuleID, value: "Aritra")
+
+        let notionRuleID = preferencesModel.addRule()
+        preferencesModel.updateRuleSourceBundleID(id: notionRuleID, value: "notion.id")
+        preferencesModel.updateRuleTargetKind(id: notionRuleID, targetKind: .helium)
+        preferencesModel.updateRuleHeliumProfileDirectory(id: notionRuleID, value: "Brighterway")
+
+        try preferencesModel.save()
+
+        let browserLauncher = RoutingPipelineBrowserLauncherSpy()
+        let intakeController = URLIntakeController(
+            configStore: RouterConfigStore(configFileURL: configFileURL),
+            ruleEngine: RuleEngine(),
+            browserLauncher: browserLauncher
+        )
+
+        try await intakeController.handle(
+            urls: [URL(string: "https://example.com/from-slack")!],
+            sourceBundleID: "com.tinyspeck.slackmacgap"
+        )
+        try await intakeController.handle(
+            urls: [URL(string: "https://example.com/from-notion")!],
+            sourceBundleID: "notion.id"
+        )
+
+        let savedConfig = RouterConfig(
+            fallbackBrowserBundleID: "com.apple.Safari",
+            fallbackBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            fallbackBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: slackRuleID,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    target: .helium(profileDirectory: "Aritra")
+                ),
+                SourceAppRule(
+                    id: notionRuleID,
+                    sourceBundleID: "notion.id",
+                    target: .helium(profileDirectory: "Brighterway")
+                ),
+            ]
+        )
+
+        XCTAssertEqual(
+            browserLauncher.openCalls,
+            [
+                RoutingPipelineBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/from-slack")!,
+                    target: .helium(profileDirectory: "Aritra"),
+                    config: savedConfig
+                ),
+                RoutingPipelineBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/from-notion")!,
+                    target: .helium(profileDirectory: "Brighterway"),
+                    config: savedConfig
+                ),
+            ]
+        )
+    }
+
+    @MainActor
     func testSavedPreferencesConfigRoutesUnknownSourceToFallbackBrowser() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)

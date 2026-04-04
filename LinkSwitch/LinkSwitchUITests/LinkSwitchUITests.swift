@@ -30,6 +30,9 @@ final class LinkSwitchUITests: XCTestCase {
 
         XCTAssertTrue(app.windows["LinkSwitch"].waitForExistence(timeout: 2.0))
         XCTAssertTrue(app.popUpButtons["preferences.fallbackBrowserPopup"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.buttons["preferences.reloadButton"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.buttons["preferences.saveButton"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.textViews["preferences.rawConfigTextView"].waitForExistence(timeout: 2.0))
     }
 
     @MainActor

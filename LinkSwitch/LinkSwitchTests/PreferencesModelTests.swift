@@ -323,6 +323,52 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
+    func testConfigValidationMessageReturnsNilWhenCurrentConfigIsValid() {
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        model.fallbackBrowserBundleID = "com.apple.Safari"
+        model.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+
+        XCTAssertNil(model.configValidationMessage())
+    }
+
+    @MainActor
+    func testConfigValidationMessageDescribesEmptySourceBundleID() {
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        model.fallbackBrowserBundleID = "com.apple.Safari"
+        model.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        _ = model.addRule()
+
+        XCTAssertEqual(
+            model.configValidationMessage(),
+            "Rule \(model.ruleDrafts[0].id.uuidString) is missing a source app bundle ID."
+        )
+    }
+
+    @MainActor
+    func testRawConfigPreviewReturnsPrettyPrintedCurrentConfig() {
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        model.fallbackBrowserBundleID = "com.apple.Safari"
+        model.fallbackBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+
+        let preview = model.rawConfigPreview()
+
+        XCTAssertTrue(preview.contains("\"fallbackBrowserBundleID\" : \"com.apple.Safari\""))
+        XCTAssertTrue(preview.contains("\"rules\" : ["))
+    }
+
+    @MainActor
     func testTestFallbackBrowserUsesCurrentDraftConfig() async throws {
         let launcher = PreferencesBrowserLauncherSpy()
         let model = PreferencesModel(

@@ -8,20 +8,10 @@ protocol WorkspaceLaunching {
 
 enum NSWorkspaceLauncherError: Error, Equatable {
     case applicationExecutableNotFound(applicationURL: URL)
-    case applicationBundleIdentifierNotFound(applicationURL: URL)
-}
-
-enum RunningApplicationActivatorError: Error, Equatable {
-    case runningApplicationNotFound(bundleIdentifier: String)
-    case activateFailed(bundleIdentifier: String)
 }
 
 protocol ProcessRunning {
     func run(executableURL: URL, arguments: [String]) throws -> pid_t
-}
-
-protocol RunningApplicationActivating {
-    func activate(bundleIdentifier: String) async throws
 }
 
 enum BrowserLauncherError: Error, Equatable {
@@ -136,16 +126,13 @@ struct BrowserLauncher {
 struct NSWorkspaceLauncher: WorkspaceLaunching {
     private let workspace: NSWorkspace
     private let processRunner: any ProcessRunning
-    private let runningApplicationActivator: any RunningApplicationActivating
 
     init(
         workspace: NSWorkspace = .shared,
-        processRunner: any ProcessRunning = ProcessRunner(),
-        runningApplicationActivator: any RunningApplicationActivating = RunningApplicationActivator()
+        processRunner: any ProcessRunning = ProcessRunner()
     ) {
         self.workspace = workspace
         self.processRunner = processRunner
-        self.runningApplicationActivator = runningApplicationActivator
     }
 
     func openURLs(_ urls: [URL], withApplicationAt applicationURL: URL) async throws {
@@ -188,18 +175,16 @@ struct NSWorkspaceLauncher: WorkspaceLaunching {
             throw NSWorkspaceLauncherError.applicationExecutableNotFound(applicationURL: applicationURL)
         }
 
-        guard let bundleIdentifier = Bundle(url: applicationURL)?.bundleIdentifier else {
-            AppLogger.error("Could not resolve bundle identifier for application \(applicationURL.path())", category: .launch)
-            throw NSWorkspaceLauncherError.applicationBundleIdentifierNotFound(applicationURL: applicationURL)
-        }
-
         do {
             let processIdentifier = try processRunner.run(executableURL: executableURL, arguments: arguments)
             AppLogger.info(
                 "Launched executable \(executableURL.path()) with arguments \(arguments) as pid \(processIdentifier)",
                 category: .launch
             )
-            try await runningApplicationActivator.activate(bundleIdentifier: bundleIdentifier)
+            AppLogger.info(
+                "Skipping manual app activation after launching \(applicationURL.path()) to avoid surfacing the wrong existing window",
+                category: .launch
+            )
         } catch {
             AppLogger.error(
                 "Failed launching executable \(executableURL.path()) with arguments \(arguments): \(error)",
@@ -217,46 +202,5 @@ struct ProcessRunner: ProcessRunning {
         process.arguments = arguments
         try process.run()
         return process.processIdentifier
-    }
-}
-
-struct RunningApplicationActivator: RunningApplicationActivating {
-    private let activationOptions: NSApplication.ActivationOptions = [.activateAllWindows]
-
-    func activate(bundleIdentifier: String) async throws {
-        for attempt in 1...20 {
-            let runningApplications = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
-            if let runningApplication = runningApplications.max(by: { lhs, rhs in
-                (lhs.launchDate ?? .distantPast) < (rhs.launchDate ?? .distantPast)
-            }) {
-                AppLogger.info(
-                    "Resolved running application \(runningApplication.processIdentifier) for bundle ID \(bundleIdentifier) on activation attempt \(attempt)",
-                    category: .launch
-                )
-
-                if runningApplication.activate(options: activationOptions) {
-                    AppLogger.info(
-                        "Activated running application \(runningApplication.processIdentifier) for bundle ID \(bundleIdentifier)",
-                        category: .launch
-                    )
-                    return
-                }
-
-                AppLogger.error(
-                    "NSRunningApplication.activate returned false for bundle ID \(bundleIdentifier)",
-                    category: .launch
-                )
-                throw RunningApplicationActivatorError.activateFailed(bundleIdentifier: bundleIdentifier)
-            }
-
-            AppLogger.debug(
-                "Running application for bundle ID \(bundleIdentifier) was not available on activation attempt \(attempt)",
-                category: .launch
-            )
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-
-        AppLogger.error("Could not resolve running application for bundle ID \(bundleIdentifier) after activation retries", category: .launch)
-        throw RunningApplicationActivatorError.runningApplicationNotFound(bundleIdentifier: bundleIdentifier)
     }
 }
