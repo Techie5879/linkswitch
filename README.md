@@ -3,6 +3,7 @@
 **Route links to the right browser, automatically.**
 
 Didn't wanna pay for Velja - so made my own equivalent.
+
 LinkSwitch is a native macOS URL handler that intercepts `http` and `https` links and opens them in the browser of your choosing — based on which app opened the link. Send Slack links to your work browser profile, let everything else go to your personal default. No manual copy-paste, no chooser popup.
 
 Rules and your default browser are stored in an explicit config file. LinkSwitch never silently infers browser preferences from the system.
