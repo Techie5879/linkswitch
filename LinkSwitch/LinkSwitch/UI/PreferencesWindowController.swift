@@ -140,6 +140,13 @@ final class PreferencesViewController: NSViewController {
 
     private let handlerPrimaryLabel = NSTextField(labelWithString: "")
     private let handlerSecondaryLabel = NSTextField(wrappingLabelWithString: "")
+    private let openAtLoginStatusLabel = NSTextField(wrappingLabelWithString: "")
+
+    private lazy var openAtLoginCheckbox: NSButton = {
+        let button = NSButton(checkboxWithTitle: "Open LinkSwitch at login", target: self, action: #selector(toggleOpenAtLogin(_:)))
+        button.setAccessibilityIdentifier("preferences.openAtLoginCheckbox")
+        return button
+    }()
 
     private lazy var registerHandlerButton: NSButton = makeButton(
         title: "Set LinkSwitch as HTTP/HTTPS Handler",
@@ -163,6 +170,12 @@ final class PreferencesViewController: NSViewController {
         title: "Save",
         action: #selector(savePreferences(_:)),
         accessibilityIdentifier: "preferences.saveButton"
+    )
+
+    private lazy var openLoginItemsSettingsButton: NSButton = makeButton(
+        title: "Open Login Items Settings",
+        action: #selector(openLoginItemsSettings(_:)),
+        accessibilityIdentifier: "preferences.openLoginItemsSettingsButton"
     )
 
     // MARK: Misc controls
@@ -417,7 +430,16 @@ final class PreferencesViewController: NSViewController {
         buttonsStack.alignment = .leading
         buttonsStack.spacing = 8
 
-        let contentStack = NSStackView(views: [titleLabel, statusRow, buttonsStack])
+        openAtLoginStatusLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        openAtLoginStatusLabel.textColor = .secondaryLabelColor
+        openAtLoginStatusLabel.maximumNumberOfLines = 0
+
+        let openAtLoginSection = NSStackView(views: [openAtLoginCheckbox, openAtLoginStatusLabel, openLoginItemsSettingsButton])
+        openAtLoginSection.orientation = .vertical
+        openAtLoginSection.alignment = .leading
+        openAtLoginSection.spacing = 8
+
+        let contentStack = NSStackView(views: [titleLabel, statusRow, buttonsStack, openAtLoginSection])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
@@ -571,6 +593,7 @@ final class PreferencesViewController: NSViewController {
         refreshDefaultBrowserPopup()
         refreshDefaultProfileBrowserSection()
         refreshHandlerStatusDisplay()
+        refreshOpenAtLoginDisplay()
 
         refreshRules()
         refreshRawConfigPreview()
@@ -688,6 +711,33 @@ final class PreferencesViewController: NSViewController {
             }
             registerHandlerButton.isHidden = false
             setDefaultBrowserAsDefaultHandlerButton.isHidden = true
+        }
+    }
+
+    private func refreshOpenAtLoginDisplay() {
+        let status = model.launchAtLoginStatus()
+        openAtLoginCheckbox.state = status.isToggleOn ? .on : .off
+        openLoginItemsSettingsButton.isHidden = status != .requiresApproval
+
+        switch status {
+        case .enabled:
+            openAtLoginStatusLabel.stringValue = "LinkSwitch is set to open automatically when you log in."
+            openAtLoginStatusLabel.textColor = .systemGreen
+        case .requiresApproval:
+            openAtLoginStatusLabel.stringValue =
+                "LinkSwitch was added to Login Items, but macOS still needs approval in System Settings."
+            openAtLoginStatusLabel.textColor = .systemOrange
+        case .notRegistered:
+            openAtLoginStatusLabel.stringValue = "LinkSwitch is not set to open automatically when you log in."
+            openAtLoginStatusLabel.textColor = .secondaryLabelColor
+        case .notFound:
+            openAtLoginStatusLabel.stringValue =
+                "macOS could not find a stable login-item registration for this app. Reinstall the dev app and try again."
+            openAtLoginStatusLabel.textColor = .systemOrange
+        case .unsupported:
+            openAtLoginStatusLabel.stringValue =
+                "macOS reported an unsupported Login Items state for LinkSwitch."
+            openAtLoginStatusLabel.textColor = .systemRed
         }
     }
 
@@ -1057,6 +1107,48 @@ final class PreferencesViewController: NSViewController {
                 )
             }
         }
+    }
+
+    @objc private func toggleOpenAtLogin(_ sender: NSButton) {
+        let shouldEnable = sender.state == .on
+        AppLogger.info("User toggled Open at Login to \(shouldEnable)", category: .app)
+
+        do {
+            let updatedStatus = try model.setLaunchAtLoginEnabled(shouldEnable)
+            refreshOpenAtLoginDisplay()
+
+            switch (shouldEnable, updatedStatus) {
+            case (true, .enabled):
+                setStatus("LinkSwitch will now open automatically when you log in.", style: .success)
+            case (true, .requiresApproval):
+                setStatus("Approve LinkSwitch in Login Items to finish enabling Open at Login.", style: .warning)
+            case (true, .notFound):
+                setStatus("Could not finish enabling Open at Login for this app bundle.", style: .error)
+            case (true, .unsupported):
+                setStatus("macOS reported an unsupported Login Items state.", style: .error)
+            case (true, .notRegistered):
+                setStatus("LinkSwitch is still not registered to open at login.", style: .warning)
+            case (false, .notRegistered), (false, .notFound):
+                setStatus("LinkSwitch will no longer open automatically when you log in.")
+            case (false, .unsupported):
+                setStatus("macOS reported an unsupported Login Items state.", style: .error)
+            case (false, .enabled), (false, .requiresApproval):
+                setStatus("LinkSwitch is still present in Login Items.", style: .warning)
+            }
+        } catch {
+            refreshOpenAtLoginDisplay()
+            presentPreferencesError(
+                error,
+                message: shouldEnable
+                    ? "Could not enable Open at Login."
+                    : "Could not disable Open at Login."
+            )
+        }
+    }
+
+    @objc private func openLoginItemsSettings(_ sender: Any?) {
+        model.openSystemSettingsLoginItems()
+        setStatus("Opened System Settings to Login Items.")
     }
 
     private func testRule(id: UUID) {

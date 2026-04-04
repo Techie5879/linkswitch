@@ -88,6 +88,7 @@ final class PreferencesModel {
     private let configStore: any RouterConfigLoading & RouterConfigSaving
     private let browserLauncher: any BrowserLaunching
     private let launchServicesBridge: LaunchServicesBridge
+    private let launchAtLoginBridge: LaunchAtLoginBridge
     private let browserDiscovery: any BrowserDiscovering
     private let installedApplicationDiscovery: any InstalledApplicationDiscovering
 
@@ -105,6 +106,7 @@ final class PreferencesModel {
         browserLauncher: any BrowserLaunching,
         configFileURLDescription: String,
         launchServicesBridge: LaunchServicesBridge = LaunchServicesBridge(),
+        launchAtLoginBridge: LaunchAtLoginBridge = LaunchAtLoginBridge(),
         browserDiscovery: any BrowserDiscovering = BrowserDiscovery(),
         installedApplicationDiscovery: any InstalledApplicationDiscovering = InstalledApplicationDiscovery()
     ) {
@@ -112,6 +114,7 @@ final class PreferencesModel {
         self.browserLauncher = browserLauncher
         self.configFileURLDescription = configFileURLDescription
         self.launchServicesBridge = launchServicesBridge
+        self.launchAtLoginBridge = launchAtLoginBridge
         self.browserDiscovery = browserDiscovery
         self.installedApplicationDiscovery = installedApplicationDiscovery
     }
@@ -399,6 +402,20 @@ final class PreferencesModel {
             applicationBundleIdentifier: defaultBrowserBundleID,
             urlSchemes: ["http", "https"]
         )
+    }
+
+    func launchAtLoginStatus() -> LaunchAtLoginStatus {
+        launchAtLoginBridge.status()
+    }
+
+    func setLaunchAtLoginEnabled(_ enabled: Bool) throws -> LaunchAtLoginStatus {
+        AppLogger.info("Preferences requested launch-at-login enabled=\(enabled)", category: .launch)
+        return try launchAtLoginBridge.setEnabled(enabled)
+    }
+
+    func openSystemSettingsLoginItems() {
+        AppLogger.info("Preferences requested opening System Settings Login Items", category: .launch)
+        launchAtLoginBridge.openSystemSettingsLoginItems()
     }
 
     private func updateRule(id: UUID, mutate: (inout PreferencesRuleDraft) -> Void) {

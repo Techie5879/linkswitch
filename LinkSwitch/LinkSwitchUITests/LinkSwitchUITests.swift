@@ -32,6 +32,7 @@ final class LinkSwitchUITests: XCTestCase {
         XCTAssertTrue(app.popUpButtons["preferences.defaultBrowserPopup"].waitForExistence(timeout: 2.0))
         XCTAssertTrue(app.buttons["preferences.reloadButton"].waitForExistence(timeout: 2.0))
         XCTAssertTrue(app.buttons["preferences.saveButton"].waitForExistence(timeout: 2.0))
+        XCTAssertTrue(app.checkBoxes["preferences.openAtLoginCheckbox"].waitForExistence(timeout: 2.0))
         let toggleButton = app.buttons["preferences.toggleRawConfigButton"]
         XCTAssertTrue(toggleButton.waitForExistence(timeout: 2.0))
         XCTAssertFalse(app.textViews["preferences.rawConfigTextView"].exists)

@@ -166,15 +166,45 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
         XCTAssertEqual(popup.titleOfSelectedItem, "Google Chrome")
     }
 
+    func testOpenAtLoginControlsExistInPreferences() throws {
+        let controller = try makeController(
+            config: RouterConfig(
+                defaultBrowserBundleID: "com.apple.Safari",
+                defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                defaultBrowserRoute: .plain,
+                rules: []
+            ),
+            browsers: [],
+            applications: [],
+            launchAtLoginProvider: LayoutLaunchAtLoginProviderStub(status: .requiresApproval)
+        )
+
+        let openAtLoginCheckbox = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSButton }
+                .first { $0.accessibilityIdentifier() == "preferences.openAtLoginCheckbox" }
+        )
+        let openLoginItemsSettingsButton = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSButton }
+                .first { $0.accessibilityIdentifier() == "preferences.openLoginItemsSettingsButton" }
+        )
+
+        XCTAssertEqual(openAtLoginCheckbox.state, .on)
+        XCTAssertFalse(openLoginItemsSettingsButton.isHidden)
+    }
+
     private func makeController(
         config: RouterConfig,
         browsers: [DiscoveredBrowser],
-        applications: [DiscoveredApplication]
+        applications: [DiscoveredApplication],
+        launchAtLoginProvider: LayoutLaunchAtLoginProviderStub = LayoutLaunchAtLoginProviderStub(status: .notRegistered)
     ) throws -> PreferencesViewController {
         let model = PreferencesModel(
             configStore: LayoutPreferencesConfigStoreStub(loadResult: config),
             browserLauncher: LayoutBrowserLauncherSpy(),
             configFileURLDescription: "/tmp/router-config.json",
+            launchAtLoginBridge: LaunchAtLoginBridge(provider: launchAtLoginProvider),
             browserDiscovery: LayoutBrowserDiscoveryStub(browsers: browsers),
             installedApplicationDiscovery: LayoutInstalledApplicationDiscoveryStub(applications: applications)
         )
@@ -225,4 +255,18 @@ private struct LayoutInstalledApplicationDiscoveryStub: InstalledApplicationDisc
     func discoverInstalledApplications(excludingBundleID: String?) -> [DiscoveredApplication] {
         applications
     }
+}
+
+private final class LayoutLaunchAtLoginProviderStub: LaunchAtLoginProviding {
+    var status: LaunchAtLoginStatus
+
+    init(status: LaunchAtLoginStatus) {
+        self.status = status
+    }
+
+    func register() throws {}
+
+    func unregister() throws {}
+
+    func openSystemSettingsLoginItems() {}
 }

@@ -816,6 +816,52 @@ final class PreferencesModelTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testLaunchAtLoginStatusReturnsBridgeStatus() {
+        let provider = PreferencesLaunchAtLoginProviderSpy(status: .requiresApproval)
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchAtLoginBridge: LaunchAtLoginBridge(provider: provider)
+        )
+
+        XCTAssertEqual(model.launchAtLoginStatus(), .requiresApproval)
+    }
+
+    @MainActor
+    func testSetLaunchAtLoginEnabledDelegatesToBridge() throws {
+        let provider = PreferencesLaunchAtLoginProviderSpy(status: .notRegistered)
+        provider.statusAfterRegister = .enabled
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchAtLoginBridge: LaunchAtLoginBridge(provider: provider)
+        )
+
+        let updatedStatus = try model.setLaunchAtLoginEnabled(true)
+
+        XCTAssertEqual(provider.registerCallCount, 1)
+        XCTAssertEqual(provider.unregisterCallCount, 0)
+        XCTAssertEqual(updatedStatus, .enabled)
+    }
+
+    @MainActor
+    func testOpenSystemSettingsLoginItemsDelegatesToBridge() {
+        let provider = PreferencesLaunchAtLoginProviderSpy(status: .requiresApproval)
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            launchAtLoginBridge: LaunchAtLoginBridge(provider: provider)
+        )
+
+        model.openSystemSettingsLoginItems()
+
+        XCTAssertEqual(provider.openSystemSettingsCallCount, 1)
+    }
+
     private func makeApplicationBundle(name: String, bundleIdentifier: String) throws -> URL {
         let temporaryDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -901,5 +947,35 @@ private final class PreferencesLaunchServicesProviderSpy: LaunchServicesProvidin
 
     func setDefaultHandler(applicationURL: URL, urlScheme: String) async throws {
         defaultHandlerSetCalls.append(SetCall(applicationURL: applicationURL, urlScheme: urlScheme))
+    }
+}
+
+private final class PreferencesLaunchAtLoginProviderSpy: LaunchAtLoginProviding {
+    var status: LaunchAtLoginStatus
+    var statusAfterRegister: LaunchAtLoginStatus
+    var statusAfterUnregister: LaunchAtLoginStatus
+
+    private(set) var registerCallCount = 0
+    private(set) var unregisterCallCount = 0
+    private(set) var openSystemSettingsCallCount = 0
+
+    init(status: LaunchAtLoginStatus) {
+        self.status = status
+        self.statusAfterRegister = status
+        self.statusAfterUnregister = status
+    }
+
+    func register() throws {
+        registerCallCount += 1
+        status = statusAfterRegister
+    }
+
+    func unregister() throws {
+        unregisterCallCount += 1
+        status = statusAfterUnregister
+    }
+
+    func openSystemSettingsLoginItems() {
+        openSystemSettingsCallCount += 1
     }
 }
