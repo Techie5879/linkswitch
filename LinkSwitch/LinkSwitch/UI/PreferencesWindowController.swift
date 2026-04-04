@@ -729,7 +729,7 @@ final class PreferencesViewController: NSViewController {
         }
 
         defaultProfileContainerView.isHidden = false
-        let result = BrowserProfileRoutePicker.loadProfileCards(mode: mode, defaultBrowserBundleID: bundleID)
+        let result = BrowserProfileRoutePicker.loadProfileCards(mode: mode, browserBundleID: bundleID)
         defaultBrowserDisplayedProfiles = result.displayedProfiles
         if let errorMessage = result.errorMessage {
             defaultProfileDiscoveryErrorLabel.stringValue = errorMessage
@@ -798,7 +798,7 @@ final class PreferencesViewController: NSViewController {
             route = profile.profileKey.isEmpty ? .plain : .firefoxProfile(profileKey: profile.profileKey)
         case .defaultZenContainer:
             route = profile.profileKey.isEmpty ? .plain : .zenContainer(containerName: profile.profileKey)
-        case .none, .heliumProfile:
+        case .none, .browserHeliumProfile, .browserFirefoxProfile, .browserZenContainer:
             return
         }
         model.updateDefaultBrowserRoute(route)
@@ -828,6 +828,7 @@ final class PreferencesViewController: NSViewController {
             let row = PreferencesRuleRowView(
                 draft: draft,
                 discoveredApplications: model.discoveredApplications,
+                discoveredBrowsers: model.discoveredBrowsers,
                 iconProvider: iconProvider,
                 defaultBrowserBundleID: model.defaultBrowserBundleID,
                 defaultBrowserAppURL: model.defaultBrowserAppURL,
@@ -839,18 +840,13 @@ final class PreferencesViewController: NSViewController {
                 onSourcePickerNeedsUIRefresh: { [weak self] in
                     self?.refreshUI()
                 },
-                onTargetKindChange: { [weak self] targetKind in
-                    self?.model.updateRuleTargetKind(id: draft.id, targetKind: targetKind)
-                    self?.refreshUI()
-                    self?.scheduleAutoSave()
-                },
-                onDefaultBrowserRouteChange: { [weak self] route in
-                    self?.model.updateRuleDefaultBrowserRoute(id: draft.id, route: route)
+                onTargetSelectionChange: { [weak self] selection in
+                    self?.model.updateRuleTargetSelection(id: draft.id, targetSelection: selection)
                     self?.refreshRawConfigPreview()
                     self?.scheduleAutoSave()
                 },
-                onHeliumProfileDirectoryChange: { [weak self] value in
-                    self?.model.updateRuleHeliumProfileDirectory(id: draft.id, value: value)
+                onBrowserRouteChange: { [weak self] route in
+                    self?.model.updateRuleBrowserRoute(id: draft.id, route: route)
                     self?.refreshRawConfigPreview()
                     self?.scheduleAutoSave()
                 },
@@ -1112,12 +1108,17 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         static let enterBundleIDManually = -996
     }
 
+    private enum TargetPopupTag {
+        static let defaultBrowser = -995
+        static let customBrowser = -994
+    }
+
     private let sourceAppPopUpButton: NSPopUpButton
     private let manualBundleIDField: NSTextField
     private let manualBundleIDLabel: NSTextField
     private let manualBundleIDStack: NSStackView
     private let sourceIconView: NSImageView
-    private let targetKindPopupButton: NSPopUpButton
+    private let targetBrowserPopupButton: NSPopUpButton
     private let targetIconView: NSImageView
     private let profileCardsStack: NSStackView
     private let profileSectionLabel: NSTextField
@@ -1126,18 +1127,19 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
     private var discoveredProfiles: [BrowserProfile] = []
     private var currentSelectionKey: String
+    private var currentTargetSelection: PreferencesRuleTargetSelection
 
     private let draft: PreferencesRuleDraft
     private let discoveredApplications: [DiscoveredApplication]
+    private let discoveredBrowsers: [DiscoveredBrowser]
     private let iconProvider: AppIconProvider
     private let defaultBrowserBundleID: String
     private var defaultBrowserAppURL: URL?
 
     private let onSourceBundleIDChange: (String) -> Void
     private let onSourcePickerNeedsUIRefresh: () -> Void
-    private let onTargetKindChange: (PreferencesRuleTargetKind) -> Void
-    private let onDefaultBrowserRouteChange: (DefaultBrowserRoute) -> Void
-    private let onHeliumProfileDirectoryChange: (String) -> Void
+    private let onTargetSelectionChange: (PreferencesRuleTargetSelection) -> Void
+    private let onBrowserRouteChange: (DefaultBrowserRoute) -> Void
     private let onRemove: () -> Void
     private let onTest: () -> Void
 
@@ -1148,45 +1150,41 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     init(
         draft: PreferencesRuleDraft,
         discoveredApplications: [DiscoveredApplication],
+        discoveredBrowsers: [DiscoveredBrowser],
         iconProvider: AppIconProvider,
         defaultBrowserBundleID: String,
         defaultBrowserAppURL: URL?,
         onSourceBundleIDChange: @escaping (String) -> Void,
         onSourcePickerNeedsUIRefresh: @escaping () -> Void,
-        onTargetKindChange: @escaping (PreferencesRuleTargetKind) -> Void,
-        onDefaultBrowserRouteChange: @escaping (DefaultBrowserRoute) -> Void,
-        onHeliumProfileDirectoryChange: @escaping (String) -> Void,
+        onTargetSelectionChange: @escaping (PreferencesRuleTargetSelection) -> Void,
+        onBrowserRouteChange: @escaping (DefaultBrowserRoute) -> Void,
         onRemove: @escaping () -> Void,
         onTest: @escaping () -> Void
     ) {
         self.draft = draft
         self.discoveredApplications = discoveredApplications
+        self.discoveredBrowsers = discoveredBrowsers
         self.iconProvider = iconProvider
         self.defaultBrowserBundleID = defaultBrowserBundleID
         self.defaultBrowserAppURL = defaultBrowserAppURL
         self.onSourceBundleIDChange = onSourceBundleIDChange
         self.onSourcePickerNeedsUIRefresh = onSourcePickerNeedsUIRefresh
-        self.onTargetKindChange = onTargetKindChange
-        self.onDefaultBrowserRouteChange = onDefaultBrowserRouteChange
-        self.onHeliumProfileDirectoryChange = onHeliumProfileDirectoryChange
+        self.onTargetSelectionChange = onTargetSelectionChange
+        self.onBrowserRouteChange = onBrowserRouteChange
         self.onRemove = onRemove
         self.onTest = onTest
 
         lastAppliedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch draft.targetKind {
-        case .defaultBrowser:
-            switch draft.defaultBrowserRoute {
-            case .plain:
-                currentSelectionKey = ""
-            case let .heliumProfile(profileDirectory):
-                currentSelectionKey = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-            case let .firefoxProfile(profileKey):
-                currentSelectionKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            case let .zenContainer(containerName):
-                currentSelectionKey = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        case .helium:
-            currentSelectionKey = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentTargetSelection = draft.targetSelection
+        switch draft.browserRoute {
+        case .plain:
+            currentSelectionKey = ""
+        case let .heliumProfile(profileDirectory):
+            currentSelectionKey = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .firefoxProfile(profileKey):
+            currentSelectionKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let .zenContainer(containerName):
+            currentSelectionKey = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         sourceAppPopUpButton = NSPopUpButton()
@@ -1195,7 +1193,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         manualBundleIDLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         manualBundleIDLabel.textColor = .secondaryLabelColor
 
-        targetKindPopupButton = NSPopUpButton()
+        targetBrowserPopupButton = NSPopUpButton()
         profileCardsStack = NSStackView()
         profileSectionLabel = NSTextField(labelWithString: "Profile")
         profileSectionLabel.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
@@ -1228,9 +1226,10 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
         buildLayout(draft: draft)
         populateSourceMenu()
+        populateTargetMenu()
         applyManualFieldVisibilityForInitialState()
         updateSourceIcon(bundleID: draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines))
-        updateTargetIcon(targetKind: draft.targetKind)
+        updateTargetIcon(targetSelection: draft.targetSelection)
         refreshProfilePresentation()
         if profileRouteSelectionMode() != .none {
             refreshProfileCards()
@@ -1297,6 +1296,61 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         manualBundleIDStack.isHidden = trimmed.isEmpty || inList
     }
 
+    private func populateTargetMenu() {
+        targetBrowserPopupButton.removeAllItems()
+        guard let menu = targetBrowserPopupButton.menu else { return }
+
+        let defaultItem = NSMenuItem(title: "Default Browser", action: nil, keyEquivalent: "")
+        defaultItem.tag = TargetPopupTag.defaultBrowser
+        menu.addItem(defaultItem)
+
+        let selectedBundleID = currentTargetSelection.bundleID
+        let matchIndex = selectedBundleID.flatMap { bundleID in
+            discoveredBrowsers.firstIndex(where: { $0.bundleID == bundleID })
+        }
+
+        if let selectedBundleID, matchIndex == nil {
+            let customItem = NSMenuItem(
+                title: "Current: \(targetDisplayName(forBundleID: selectedBundleID, applicationURL: currentTargetSelection.applicationURL))",
+                action: nil,
+                keyEquivalent: ""
+            )
+            customItem.tag = TargetPopupTag.customBrowser
+            menu.addItem(customItem)
+        }
+
+        if !discoveredBrowsers.isEmpty {
+            menu.addItem(.separator())
+        }
+
+        for (index, browser) in discoveredBrowsers.enumerated() {
+            let item = NSMenuItem(title: browser.name, action: nil, keyEquivalent: "")
+            item.tag = index
+            menu.addItem(item)
+        }
+
+        switch currentTargetSelection {
+        case .defaultBrowser:
+            targetBrowserPopupButton.selectItem(withTag: TargetPopupTag.defaultBrowser)
+        case .browser:
+            if let matchIndex {
+                targetBrowserPopupButton.selectItem(withTag: matchIndex)
+            } else {
+                targetBrowserPopupButton.selectItem(withTag: TargetPopupTag.customBrowser)
+            }
+        }
+    }
+
+    private func targetDisplayName(forBundleID bundleID: String, applicationURL: URL?) -> String {
+        if let browser = discoveredBrowsers.first(where: { $0.bundleID == bundleID }) {
+            return browser.name
+        }
+        if let applicationURL {
+            return applicationURL.deletingPathExtension().lastPathComponent
+        }
+        return bundleID
+    }
+
     private static func makeMenuItem(title: String, icon: NSImage, tag: Int) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         let menuIcon = icon.copy() as! NSImage
@@ -1328,14 +1382,11 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         arrowLabel.setContentHuggingPriority(.required, for: .horizontal)
         arrowLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        targetKindPopupButton.addItems(withTitles: PreferencesRuleTargetKind.allCases.map(\.displayName))
-        targetKindPopupButton.selectItem(at: draft.targetKind == .defaultBrowser ? 0 : 1)
-        targetKindPopupButton.target = self
-        targetKindPopupButton.action = #selector(targetKindChanged(_:))
-        targetKindPopupButton.setAccessibilityIdentifier("preferences.rule.targetKindPopup")
-        updateTargetPopupIcons()
+        targetBrowserPopupButton.target = self
+        targetBrowserPopupButton.action = #selector(targetBrowserChanged(_:))
+        targetBrowserPopupButton.setAccessibilityIdentifier("preferences.rule.targetBrowserPopup")
 
-        let targetPickerRow = NSStackView(views: [targetIconView, targetKindPopupButton])
+        let targetPickerRow = NSStackView(views: [targetIconView, targetBrowserPopupButton])
         targetPickerRow.orientation = .horizontal
         targetPickerRow.alignment = .centerY
         targetPickerRow.spacing = 8
@@ -1391,7 +1442,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             targetIconView.widthAnchor.constraint(equalToConstant: 24),
             targetIconView.heightAnchor.constraint(equalToConstant: 24),
             sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
-            targetKindPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            targetBrowserPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             manualBundleIDField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             profileCardsStack.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
             profileCardsStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
@@ -1421,50 +1472,54 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         sourceIconView.image = iconProvider.icon(forBundleID: bundleID)
     }
 
-    private func updateTargetIcon(targetKind: PreferencesRuleTargetKind) {
-        switch targetKind {
+    private func updateTargetIcon(targetSelection: PreferencesRuleTargetSelection) {
+        switch targetSelection {
         case .defaultBrowser:
             if let appURL = defaultBrowserAppURL {
                 targetIconView.image = iconProvider.icon(forAppURL: appURL)
             } else {
                 targetIconView.image = NSImage(named: NSImage.applicationIconName)
             }
-        case .helium:
-            targetIconView.image = iconProvider.icon(forBundleID: BrowserLauncher.heliumBundleID)
-        }
-    }
-
-    private func updateTargetPopupIcons() {
-        guard let menu = targetKindPopupButton.menu else { return }
-        let kinds = PreferencesRuleTargetKind.allCases
-        for (index, item) in menu.items.enumerated() where index < kinds.count {
-            let kind = kinds[index]
-            let icon: NSImage
-            switch kind {
-            case .defaultBrowser:
-                if let appURL = defaultBrowserAppURL {
-                    icon = iconProvider.icon(forAppURL: appURL)
-                } else {
-                    icon = NSImage(named: NSImage.applicationIconName) ?? NSImage()
-                }
-            case .helium:
-                icon = iconProvider.icon(forBundleID: BrowserLauncher.heliumBundleID)
+        case let .browser(bundleID, applicationURL):
+            if let applicationURL {
+                targetIconView.image = iconProvider.icon(forAppURL: applicationURL)
+            } else {
+                targetIconView.image = iconProvider.icon(forBundleID: bundleID)
             }
-            let menuIcon = icon.copy() as! NSImage
-            menuIcon.size = NSSize(width: 16, height: 16)
-            item.image = menuIcon
         }
     }
 
-    private func selectedTargetKind() -> PreferencesRuleTargetKind {
-        targetKindPopupButton.indexOfSelectedItem == 0 ? .defaultBrowser : .helium
+    private func selectedTargetSelection() -> PreferencesRuleTargetSelection {
+        guard let tag = targetBrowserPopupButton.selectedItem?.tag else {
+            return currentTargetSelection
+        }
+        if tag == TargetPopupTag.defaultBrowser {
+            return .defaultBrowser
+        }
+        if tag == TargetPopupTag.customBrowser {
+            return currentTargetSelection
+        }
+        if tag >= 0, tag < discoveredBrowsers.count {
+            let browser = discoveredBrowsers[tag]
+            return .browser(bundleID: browser.bundleID, applicationURL: browser.appURL)
+        }
+        return currentTargetSelection
     }
 
     private func profileRouteSelectionMode() -> BrowserProfileRouteSelectionMode {
         BrowserProfileRouteSelectionMode.mode(
-            targetKind: selectedTargetKind(),
+            targetSelection: currentTargetSelection,
             defaultBrowserBundleID: defaultBrowserBundleID
         )
+    }
+
+    private func profileRouteTargetBundleID() -> String {
+        switch currentTargetSelection {
+        case .defaultBrowser:
+            return defaultBrowserBundleID
+        case let .browser(bundleID, _):
+            return bundleID
+        }
     }
 
     private func refreshProfilePresentation() {
@@ -1564,15 +1619,16 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         }
     }
 
-    @objc private func targetKindChanged(_ sender: Any?) {
-        let targetKind = selectedTargetKind()
+    @objc private func targetBrowserChanged(_ sender: Any?) {
+        currentTargetSelection = selectedTargetSelection()
         currentSelectionKey = ""
         refreshProfilePresentation()
         if profileRouteSelectionMode() != .none {
             refreshProfileCards()
         }
-        updateTargetIcon(targetKind: targetKind)
-        onTargetKindChange(targetKind)
+        updateTargetIcon(targetSelection: currentTargetSelection)
+        onTargetSelectionChange(currentTargetSelection)
+        AppLogger.info("Source rule row: selected target \(String(describing: currentTargetSelection.bundleID ?? "default browser"))", category: .app)
     }
 
     @objc private func profileCardSelected(_ sender: NSButton) {
@@ -1580,23 +1636,21 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         let profile = discoveredProfiles[sender.tag]
         currentSelectionKey = profile.profileKey
         switch profileRouteSelectionMode() {
-        case .heliumProfile:
-            onHeliumProfileDirectoryChange(profile.profileKey)
-        case .defaultHeliumProfile:
+        case .browserHeliumProfile, .defaultHeliumProfile:
             let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .heliumProfile(profileDirectory: profile.profileKey)
-            onDefaultBrowserRouteChange(route)
-        case .defaultFirefoxProfile:
+            onBrowserRouteChange(route)
+        case .browserFirefoxProfile, .defaultFirefoxProfile:
             let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .firefoxProfile(profileKey: profile.profileKey)
-            onDefaultBrowserRouteChange(route)
-        case .defaultZenContainer:
+            onBrowserRouteChange(route)
+        case .browserZenContainer, .defaultZenContainer:
             let route: DefaultBrowserRoute = profile.profileKey.isEmpty
                 ? .plain
                 : .zenContainer(containerName: profile.profileKey)
-            onDefaultBrowserRouteChange(route)
+            onBrowserRouteChange(route)
         case .none:
             return
         }
@@ -1613,7 +1667,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
         let result = BrowserProfileRoutePicker.loadProfileCards(
             mode: mode,
-            defaultBrowserBundleID: defaultBrowserBundleID
+            browserBundleID: profileRouteTargetBundleID()
         )
         discoveredProfiles = result.displayedProfiles
         if let errorMessage = result.errorMessage {
@@ -1682,13 +1736,3 @@ private final class DefaultBrowserAccessibilityPopUpButton: NSPopUpButton {
     }
 }
 
-// MARK: - PreferencesRuleTargetKind display names
-
-private extension PreferencesRuleTargetKind {
-    var displayName: String {
-        switch self {
-        case .defaultBrowser: return "Default Browser"
-        case .helium: return "Helium"
-        }
-    }
-}

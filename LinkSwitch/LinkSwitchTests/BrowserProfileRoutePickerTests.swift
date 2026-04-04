@@ -12,10 +12,23 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
     func testDefaultBrowserRuleModeUsesDefaultHeliumProfileWhenDefaultBrowserIsHelium() {
         XCTAssertEqual(
             BrowserProfileRouteSelectionMode.mode(
-                targetKind: .defaultBrowser,
+                targetSelection: .defaultBrowser,
                 defaultBrowserBundleID: BrowserLauncher.heliumBundleID
             ),
             .defaultHeliumProfile
+        )
+    }
+
+    func testExplicitBrowserRuleModeUsesBrowserFirefoxProfileForFirefoxBundleID() {
+        XCTAssertEqual(
+            BrowserProfileRouteSelectionMode.mode(
+                targetSelection: .browser(
+                    bundleID: "org.mozilla.firefox",
+                    applicationURL: URL(fileURLWithPath: "/Applications/Firefox.app")
+                ),
+                defaultBrowserBundleID: "com.apple.Safari"
+            ),
+            .browserFirefoxProfile
         )
     }
 

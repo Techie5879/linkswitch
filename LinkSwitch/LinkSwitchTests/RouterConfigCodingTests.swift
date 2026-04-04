@@ -28,6 +28,14 @@ final class RouterConfigCodingTests: XCTestCase {
                     sourceBundleID: "app.zen-browser.zen",
                     target: .defaultBrowserZenContainer(containerName: "Work")
                 ),
+                SourceAppRule(
+                    id: UUID(uuidString: "44444444-5555-6666-7777-888888888888")!,
+                    sourceBundleID: "com.apple.mail",
+                    target: .application(
+                        bundleID: "com.google.Chrome",
+                        applicationURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")
+                    )
+                ),
             ]
         )
 

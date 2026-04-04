@@ -39,6 +39,10 @@ enum BrowserTarget: Codable, Equatable, CustomStringConvertible {
     case defaultBrowserHeliumProfile(profileDirectory: String)
     case defaultBrowserFirefoxProfile(profileKey: String)
     case defaultBrowserZenContainer(containerName: String)
+    case application(bundleID: String, applicationURL: URL)
+    case applicationHeliumProfile(bundleID: String, applicationURL: URL, profileDirectory: String)
+    case applicationFirefoxProfile(bundleID: String, applicationURL: URL, profileKey: String)
+    case applicationZenContainer(bundleID: String, applicationURL: URL, containerName: String)
     case helium(profileDirectory: String)
 
     var description: String {
@@ -51,6 +55,14 @@ enum BrowserTarget: Codable, Equatable, CustomStringConvertible {
             return "defaultBrowserFirefoxProfile(profileKey: \(profileKey))"
         case let .defaultBrowserZenContainer(containerName):
             return "defaultBrowserZenContainer(containerName: \(containerName))"
+        case let .application(bundleID, applicationURL):
+            return "application(bundleID: \(bundleID), applicationURL: \(applicationURL.path()))"
+        case let .applicationHeliumProfile(bundleID, applicationURL, profileDirectory):
+            return "applicationHeliumProfile(bundleID: \(bundleID), applicationURL: \(applicationURL.path()), profileDirectory: \(profileDirectory))"
+        case let .applicationFirefoxProfile(bundleID, applicationURL, profileKey):
+            return "applicationFirefoxProfile(bundleID: \(bundleID), applicationURL: \(applicationURL.path()), profileKey: \(profileKey))"
+        case let .applicationZenContainer(bundleID, applicationURL, containerName):
+            return "applicationZenContainer(bundleID: \(bundleID), applicationURL: \(applicationURL.path()), containerName: \(containerName))"
         case let .helium(profileDirectory):
             return "helium(profileDirectory: \(profileDirectory))"
         }

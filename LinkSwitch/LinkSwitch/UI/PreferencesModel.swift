@@ -4,17 +4,34 @@ protocol RouterConfigSaving {
     func save(_ config: RouterConfig) throws
 }
 
-enum PreferencesRuleTargetKind: String, CaseIterable, Equatable {
+enum PreferencesRuleTargetSelection: Equatable {
     case defaultBrowser
-    case helium
+    case browser(bundleID: String, applicationURL: URL?)
+
+    var bundleID: String? {
+        switch self {
+        case .defaultBrowser:
+            return nil
+        case let .browser(bundleID, _):
+            return bundleID
+        }
+    }
+
+    var applicationURL: URL? {
+        switch self {
+        case .defaultBrowser:
+            return nil
+        case let .browser(_, applicationURL):
+            return applicationURL
+        }
+    }
 }
 
 struct PreferencesRuleDraft: Equatable {
     let id: UUID
     var sourceBundleID: String
-    var targetKind: PreferencesRuleTargetKind
-    var defaultBrowserRoute: DefaultBrowserRoute
-    var heliumProfileDirectory: String
+    var targetSelection: PreferencesRuleTargetSelection
+    var browserRoute: DefaultBrowserRoute
 }
 
 enum PreferencesModelError: Error, Equatable {
@@ -24,13 +41,13 @@ enum PreferencesModelError: Error, Equatable {
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
-    case emptyDefaultBrowserHeliumProfile(UUID)
-    case emptyDefaultBrowserFirefoxProfile(UUID)
-    case emptyDefaultBrowserZenContainer(UUID)
+    case emptyRuleHeliumProfile(UUID)
+    case emptyRuleFirefoxProfile(UUID)
+    case emptyRuleZenContainer(UUID)
     case emptyDefaultBrowserRouteHeliumProfile
     case emptyDefaultBrowserRouteFirefoxProfile
     case emptyDefaultBrowserRouteZenContainer
-    case emptyHeliumProfileDirectory(UUID)
+    case missingRuleTargetApplication(UUID, bundleID: String)
 }
 
 extension PreferencesModelError: LocalizedError {
@@ -48,11 +65,11 @@ extension PreferencesModelError: LocalizedError {
             return "The selected rule \(ruleID.uuidString) no longer exists."
         case let .emptySourceBundleID(ruleID):
             return "Rule \(ruleID.uuidString) is missing a source app bundle ID."
-        case let .emptyDefaultBrowserHeliumProfile(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a default browser Helium profile."
-        case let .emptyDefaultBrowserFirefoxProfile(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a default browser Firefox profile."
-        case let .emptyDefaultBrowserZenContainer(ruleID):
+        case let .emptyRuleHeliumProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a Helium profile."
+        case let .emptyRuleFirefoxProfile(ruleID):
+            return "Rule \(ruleID.uuidString) is missing a Firefox profile."
+        case let .emptyRuleZenContainer(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Zen container."
         case .emptyDefaultBrowserRouteHeliumProfile:
             return "The default browser route is missing a Helium profile."
@@ -60,8 +77,8 @@ extension PreferencesModelError: LocalizedError {
             return "The default browser route is missing a Firefox profile."
         case .emptyDefaultBrowserRouteZenContainer:
             return "The default browser route is missing a Zen container."
-        case let .emptyHeliumProfileDirectory(ruleID):
-            return "Rule \(ruleID.uuidString) is missing a Helium profile."
+        case let .missingRuleTargetApplication(ruleID, bundleID):
+            return "Rule \(ruleID.uuidString) could not resolve an installed browser app for \(bundleID)."
         }
     }
 }
@@ -131,41 +148,67 @@ final class PreferencesModel {
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .plain,
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .plain
                 )
             case let .defaultBrowserHeliumProfile(profileDirectory):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .heliumProfile(profileDirectory: profileDirectory),
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
                 )
             case let .defaultBrowserFirefoxProfile(profileKey):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .firefoxProfile(profileKey: profileKey),
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .firefoxProfile(profileKey: profileKey)
                 )
             case let .defaultBrowserZenContainer(containerName):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .zenContainer(containerName: containerName),
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .zenContainer(containerName: containerName)
+                )
+            case let .application(bundleID, applicationURL):
+                return PreferencesRuleDraft(
+                    id: rule.id,
+                    sourceBundleID: rule.sourceBundleID,
+                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
+                    browserRoute: .plain
+                )
+            case let .applicationHeliumProfile(bundleID, applicationURL, profileDirectory):
+                return PreferencesRuleDraft(
+                    id: rule.id,
+                    sourceBundleID: rule.sourceBundleID,
+                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
+                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
+                )
+            case let .applicationFirefoxProfile(bundleID, applicationURL, profileKey):
+                return PreferencesRuleDraft(
+                    id: rule.id,
+                    sourceBundleID: rule.sourceBundleID,
+                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
+                    browserRoute: .firefoxProfile(profileKey: profileKey)
+                )
+            case let .applicationZenContainer(bundleID, applicationURL, containerName):
+                return PreferencesRuleDraft(
+                    id: rule.id,
+                    sourceBundleID: rule.sourceBundleID,
+                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
+                    browserRoute: .zenContainer(containerName: containerName)
                 )
             case let .helium(profileDirectory):
                 return PreferencesRuleDraft(
                     id: rule.id,
                     sourceBundleID: rule.sourceBundleID,
-                    targetKind: .helium,
-                    defaultBrowserRoute: .plain,
-                    heliumProfileDirectory: profileDirectory
+                    targetSelection: .browser(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: resolvedKnownApplicationURL(forBundleID: BrowserLauncher.heliumBundleID)
+                    ),
+                    browserRoute: .heliumProfile(profileDirectory: profileDirectory)
                 )
             }
         }
@@ -188,6 +231,13 @@ final class PreferencesModel {
             "Refreshed installed applications: \(discoveredApplications.count) found",
             category: .config
         )
+    }
+
+    private func resolvedKnownApplicationURL(forBundleID bundleID: String) -> URL? {
+        if let discoveredURL = discoveredBrowsers.first(where: { $0.bundleID == bundleID })?.appURL {
+            return discoveredURL
+        }
+        return try? launchServicesBridge.applicationURL(forBundleIdentifier: bundleID)
     }
 
     func setDefaultBrowser(discoveredBrowser: DiscoveredBrowser) {
@@ -219,9 +269,8 @@ final class PreferencesModel {
             PreferencesRuleDraft(
                 id: ruleID,
                 sourceBundleID: "",
-                targetKind: .defaultBrowser,
-                defaultBrowserRoute: .plain,
-                heliumProfileDirectory: ""
+                targetSelection: .defaultBrowser,
+                browserRoute: .plain
             )
         )
         AppLogger.info("Added preferences rule draft \(ruleID)", category: .config)
@@ -237,28 +286,26 @@ final class PreferencesModel {
         updateRule(id: id) { $0.sourceBundleID = value }
     }
 
-    func updateRuleTargetKind(id: UUID, targetKind: PreferencesRuleTargetKind) {
+    func updateRuleTargetSelection(id: UUID, targetSelection: PreferencesRuleTargetSelection) {
         updateRule(id: id) { draft in
-            draft.targetKind = targetKind
-            if targetKind == .defaultBrowser {
-                draft.heliumProfileDirectory = ""
-            } else {
-                draft.defaultBrowserRoute = .plain
+            draft.targetSelection = targetSelection
+            let compatibility = switch targetSelection {
+            case .defaultBrowser:
+                defaultBrowserCompatibility(forBundleID: defaultBrowserBundleID)
+            case let .browser(bundleID, _):
+                defaultBrowserCompatibility(forBundleID: bundleID)
             }
+            draft.browserRoute = normalizedDefaultRoute(draft.browserRoute, compatibility: compatibility)
         }
     }
 
-    func updateRuleDefaultBrowserRoute(id: UUID, route: DefaultBrowserRoute) {
-        updateRule(id: id) { $0.defaultBrowserRoute = route }
+    func updateRuleBrowserRoute(id: UUID, route: DefaultBrowserRoute) {
+        updateRule(id: id) { $0.browserRoute = route }
     }
 
     func updateDefaultBrowserRoute(_ route: DefaultBrowserRoute) {
         defaultBrowserRoute = route
         AppLogger.info("Updated default browser route to \(route.description)", category: .config)
-    }
-
-    func updateRuleHeliumProfileDirectory(id: UUID, value: String) {
-        updateRule(id: id) { $0.heliumProfileDirectory = value }
     }
 
     func save() throws {
@@ -422,49 +469,85 @@ final class PreferencesModel {
     }
 
     private func makeTarget(for draft: PreferencesRuleDraft) throws -> BrowserTarget {
-        switch draft.targetKind {
+        switch draft.targetSelection {
         case .defaultBrowser:
-            switch draft.defaultBrowserRoute {
+            switch draft.browserRoute {
             case .plain:
                 return .defaultBrowser
             case let .heliumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
                     AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Helium profile directory", category: .config)
-                    throw PreferencesModelError.emptyDefaultBrowserHeliumProfile(draft.id)
+                    throw PreferencesModelError.emptyRuleHeliumProfile(draft.id)
                 }
                 return .defaultBrowserHeliumProfile(profileDirectory: trimmedProfileDirectory)
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
                     AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Firefox profile key", category: .config)
-                    throw PreferencesModelError.emptyDefaultBrowserFirefoxProfile(draft.id)
+                    throw PreferencesModelError.emptyRuleFirefoxProfile(draft.id)
                 }
                 return .defaultBrowserFirefoxProfile(profileKey: trimmedProfileKey)
             case let .zenContainer(containerName):
                 let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedContainerName.isEmpty else {
                     AppLogger.error("Preferences rule \(draft.id) had an empty Zen container name", category: .config)
-                    throw PreferencesModelError.emptyDefaultBrowserZenContainer(draft.id)
+                    throw PreferencesModelError.emptyRuleZenContainer(draft.id)
                 }
                 return .defaultBrowserZenContainer(containerName: trimmedContainerName)
             }
-        case .helium:
-            let trimmedProfileDirectory = draft.heliumProfileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedProfileDirectory.isEmpty else {
-                AppLogger.error("Preferences rule \(draft.id) had an empty Helium profile directory", category: .config)
-                throw PreferencesModelError.emptyHeliumProfileDirectory(draft.id)
+        case let .browser(bundleID, applicationURL):
+            let resolvedApplicationURL = try resolvedRuleTargetApplicationURL(
+                draftID: draft.id,
+                bundleID: bundleID,
+                applicationURL: applicationURL
+            )
+            switch draft.browserRoute {
+            case .plain:
+                return .application(bundleID: bundleID, applicationURL: resolvedApplicationURL)
+            case let .heliumProfile(profileDirectory):
+                let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedProfileDirectory.isEmpty else {
+                    AppLogger.error("Preferences rule \(draft.id) had an empty Helium profile directory", category: .config)
+                    throw PreferencesModelError.emptyRuleHeliumProfile(draft.id)
+                }
+                return .applicationHeliumProfile(
+                    bundleID: bundleID,
+                    applicationURL: resolvedApplicationURL,
+                    profileDirectory: trimmedProfileDirectory
+                )
+            case let .firefoxProfile(profileKey):
+                let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedProfileKey.isEmpty else {
+                    AppLogger.error("Preferences rule \(draft.id) had an empty Firefox profile key", category: .config)
+                    throw PreferencesModelError.emptyRuleFirefoxProfile(draft.id)
+                }
+                return .applicationFirefoxProfile(
+                    bundleID: bundleID,
+                    applicationURL: resolvedApplicationURL,
+                    profileKey: trimmedProfileKey
+                )
+            case let .zenContainer(containerName):
+                let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedContainerName.isEmpty else {
+                    AppLogger.error("Preferences rule \(draft.id) had an empty Zen container name", category: .config)
+                    throw PreferencesModelError.emptyRuleZenContainer(draft.id)
+                }
+                return .applicationZenContainer(
+                    bundleID: bundleID,
+                    applicationURL: resolvedApplicationURL,
+                    containerName: trimmedContainerName
+                )
             }
-            return .helium(profileDirectory: trimmedProfileDirectory)
         }
     }
 
     private func normalizeDefaultBrowserRuleTargetsForCurrentBrowser() {
         let selectedBundleID = defaultBrowserBundleID
-        let compatibility = defaultBrowserCompatibility(forBundleID: selectedBundleID)
+        let defaultCompatibility = defaultBrowserCompatibility(forBundleID: selectedBundleID)
 
         let defaultCurrent = defaultBrowserRoute
-        let defaultNormalized = normalizedDefaultRoute(defaultCurrent, compatibility: compatibility)
+        let defaultNormalized = normalizedDefaultRoute(defaultCurrent, compatibility: defaultCompatibility)
         if defaultNormalized != defaultCurrent {
             AppLogger.info(
                 "Normalizing default browser route from \(defaultCurrent.description) to \(defaultNormalized.description) for default browser \(selectedBundleID)",
@@ -473,16 +556,47 @@ final class PreferencesModel {
             defaultBrowserRoute = defaultNormalized
         }
 
-        for index in ruleDrafts.indices where ruleDrafts[index].targetKind == .defaultBrowser {
-            let currentRoute = ruleDrafts[index].defaultBrowserRoute
+        for index in ruleDrafts.indices {
+            let compatibility = switch ruleDrafts[index].targetSelection {
+            case .defaultBrowser:
+                defaultCompatibility
+            case let .browser(bundleID, _):
+                defaultBrowserCompatibility(forBundleID: bundleID)
+            }
+            let currentRoute = ruleDrafts[index].browserRoute
             let normalizedRoute = normalizedDefaultRoute(currentRoute, compatibility: compatibility)
             if normalizedRoute != currentRoute {
                 AppLogger.info(
-                    "Normalizing default-browser rule \(ruleDrafts[index].id) from \(currentRoute.description) to \(normalizedRoute.description) for default browser \(selectedBundleID)",
+                    "Normalizing browser rule \(ruleDrafts[index].id) from \(currentRoute.description) to \(normalizedRoute.description)",
                     category: .config
                 )
-                ruleDrafts[index].defaultBrowserRoute = normalizedRoute
+                ruleDrafts[index].browserRoute = normalizedRoute
             }
+        }
+    }
+
+    private func resolvedRuleTargetApplicationURL(
+        draftID: UUID,
+        bundleID: String,
+        applicationURL: URL?
+    ) throws -> URL {
+        if let applicationURL {
+            return applicationURL
+        }
+
+        do {
+            let resolvedURL = try launchServicesBridge.applicationURL(forBundleIdentifier: bundleID)
+            AppLogger.info(
+                "Resolved browser rule \(draftID) target \(bundleID) to \(resolvedURL.path()) via Launch Services",
+                category: .config
+            )
+            return resolvedURL
+        } catch {
+            AppLogger.error(
+                "Could not resolve browser rule \(draftID) target app for \(bundleID): \(error)",
+                category: .config
+            )
+            throw PreferencesModelError.missingRuleTargetApplication(draftID, bundleID: bundleID)
         }
     }
 

@@ -25,6 +25,33 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
     }
 
+    func testOpenDirectBrowserUsesConfiguredApplicationURL() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let url = URL(string: "https://example.com/direct-browser")!
+        let chromeURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+
+        try await launcher.open(
+            url,
+            target: .application(bundleID: "com.google.Chrome", applicationURL: chromeURL),
+            config: makeConfig()
+        )
+
+        XCTAssertEqual(
+            workspaceLauncher.openURLCalls,
+            [
+                WorkspaceLaunchSpy.OpenURLCall(
+                    urls: [url],
+                    applicationURL: chromeURL
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.launchApplicationExecutableCalls.isEmpty)
+    }
+
     func testOpenDefaultBrowserHeliumProfileLaunchesConfiguredDefaultBrowserAppWithProfileArguments() async throws {
         let workspaceLauncher = WorkspaceLaunchSpy()
         let launcher = BrowserLauncher(
@@ -87,6 +114,40 @@ final class BrowserLauncherTests: XCTestCase {
                     arguments: [
                         "--profile-directory=Profile 1",
                         "https://example.com/work",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
+    }
+
+    func testOpenDirectHeliumProfileLaunchesSelectedApplicationWithProfileArguments() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let heliumApplicationURL = URL(fileURLWithPath: "/Applications/Helium.app")
+        let url = URL(string: "https://example.com/direct-helium")!
+
+        try await launcher.open(
+            url,
+            target: .applicationHeliumProfile(
+                bundleID: BrowserLauncher.heliumBundleID,
+                applicationURL: heliumApplicationURL,
+                profileDirectory: "Profile 1"
+            ),
+            config: makeConfig()
+        )
+
+        XCTAssertEqual(
+            workspaceLauncher.launchApplicationExecutableCalls,
+            [
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
+                    applicationURL: heliumApplicationURL,
+                    arguments: [
+                        "--profile-directory=Profile 1",
+                        "https://example.com/direct-helium",
                     ]
                 ),
             ]

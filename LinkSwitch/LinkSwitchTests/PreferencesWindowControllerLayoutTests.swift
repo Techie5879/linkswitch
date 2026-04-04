@@ -70,6 +70,76 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
         }
     }
 
+    func testRuleTargetBrowserPopupListsDiscoveredBrowsersWithoutMenuIcons() throws {
+        let config = RouterConfig(
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
+            rules: [
+                SourceAppRule(
+                    id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    sourceBundleID: "com.tinyspeck.slackmacgap",
+                    target: .defaultBrowser
+                ),
+            ]
+        )
+        let controller = try makeController(
+            config: config,
+            browsers: [
+                DiscoveredBrowser(bundleID: "com.google.Chrome", name: "Google Chrome", appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")),
+                DiscoveredBrowser(bundleID: BrowserLauncher.heliumBundleID, name: "Helium", appURL: URL(fileURLWithPath: "/Applications/Helium.app")),
+                DiscoveredBrowser(bundleID: "com.apple.Safari", name: "Safari", appURL: URL(fileURLWithPath: "/Applications/Safari.app")),
+                DiscoveredBrowser(bundleID: FirefoxBrowserAppSupportPath.zenBrowserBundleID, name: "Zen", appURL: URL(fileURLWithPath: "/Applications/Zen.app")),
+            ],
+            applications: [
+                DiscoveredApplication(
+                    bundleID: "com.tinyspeck.slackmacgap",
+                    name: "Slack",
+                    appURL: URL(fileURLWithPath: "/Applications/Slack.app")
+                ),
+            ]
+        )
+
+        let popup = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSPopUpButton }
+                .first { $0.accessibilityIdentifier() == "preferences.rule.targetBrowserPopup" }
+        )
+        let menuItems = try XCTUnwrap(popup.menu?.items)
+
+        XCTAssertEqual(
+            menuItems.map(\.title),
+            ["Default Browser", "", "Google Chrome", "Helium", "Safari", "Zen"]
+        )
+        XCTAssertTrue(menuItems.filter { !$0.isSeparatorItem }.allSatisfy { $0.image == nil })
+    }
+
+    private func makeController(
+        config: RouterConfig,
+        browsers: [DiscoveredBrowser],
+        applications: [DiscoveredApplication]
+    ) throws -> PreferencesViewController {
+        let model = PreferencesModel(
+            configStore: LayoutPreferencesConfigStoreStub(loadResult: config),
+            browserLauncher: LayoutBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: LayoutBrowserDiscoveryStub(browsers: browsers),
+            installedApplicationDiscovery: LayoutInstalledApplicationDiscoveryStub(applications: applications)
+        )
+        let controller = try PreferencesViewController(model: model)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        controller.configureWindow(window)
+        window.contentViewController = controller
+        window.contentView?.layoutSubtreeIfNeeded()
+        controller.view.layoutSubtreeIfNeeded()
+        return controller
+    }
+
     private func allSubviews(in view: NSView) -> [NSView] {
         [view] + view.subviews.flatMap(allSubviews)
     }

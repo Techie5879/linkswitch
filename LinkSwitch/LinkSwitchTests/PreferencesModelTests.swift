@@ -20,7 +20,13 @@ final class PreferencesModelTests: XCTestCase {
             configStore: PreferencesConfigStoreStub(loadResult: config),
             browserLauncher: PreferencesBrowserLauncherSpy(),
             configFileURLDescription: "/tmp/router-config.json",
-            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            browserDiscovery: StubBrowserDiscovering(browsers: [
+                DiscoveredBrowser(
+                    bundleID: BrowserLauncher.heliumBundleID,
+                    name: "Helium",
+                    appURL: URL(fileURLWithPath: "/Applications/Helium.app")
+                ),
+            ]),
             installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
         )
 
@@ -35,9 +41,11 @@ final class PreferencesModelTests: XCTestCase {
                 PreferencesRuleDraft(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    targetKind: .helium,
-                    defaultBrowserRoute: .plain,
-                    heliumProfileDirectory: "Profile 1"
+                    targetSelection: .browser(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
+                    ),
+                    browserRoute: .heliumProfile(profileDirectory: "Profile 1")
                 ),
             ]
         )
@@ -73,9 +81,8 @@ final class PreferencesModelTests: XCTestCase {
                 PreferencesRuleDraft(
                     id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
                     sourceBundleID: "com.apple.mail",
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .firefoxProfile(profileKey: "Profiles/work.default"),
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .firefoxProfile(profileKey: "Profiles/work.default")
                 ),
             ]
         )
@@ -112,9 +119,8 @@ final class PreferencesModelTests: XCTestCase {
                 PreferencesRuleDraft(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.apple.mail",
-                    targetKind: .defaultBrowser,
-                    defaultBrowserRoute: .heliumProfile(profileDirectory: "Profile 2"),
-                    heliumProfileDirectory: ""
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .heliumProfile(profileDirectory: "Profile 2")
                 ),
             ]
         )
@@ -143,7 +149,13 @@ final class PreferencesModelTests: XCTestCase {
             configStore: RouterConfigStore(configFileURL: configFileURL),
             browserLauncher: PreferencesBrowserLauncherSpy(),
             configFileURLDescription: configFileURL.path(percentEncoded: false),
-            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            browserDiscovery: StubBrowserDiscovering(browsers: [
+                DiscoveredBrowser(
+                    bundleID: BrowserLauncher.heliumBundleID,
+                    name: "Helium",
+                    appURL: URL(fileURLWithPath: "/Applications/Helium.app")
+                ),
+            ]),
             installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
         )
 
@@ -158,9 +170,11 @@ final class PreferencesModelTests: XCTestCase {
                 PreferencesRuleDraft(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
                     sourceBundleID: "com.tinyspeck.slackmacgap",
-                    targetKind: .helium,
-                    defaultBrowserRoute: .plain,
-                    heliumProfileDirectory: "Profile 1"
+                    targetSelection: .browser(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
+                    ),
+                    browserRoute: .heliumProfile(profileDirectory: "Profile 1")
                 ),
             ]
         )
@@ -283,7 +297,7 @@ final class PreferencesModelTests: XCTestCase {
         model.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleDefaultBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
+        model.updateRuleBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
         let firefoxURL = try makeApplicationBundle(
             name: "Firefox",
             bundleIdentifier: "org.mozilla.firefox"
@@ -476,8 +490,14 @@ final class PreferencesModelTests: XCTestCase {
         model.sampleURLString = "https://example.com/work"
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleTargetKind(id: ruleID, targetKind: .helium)
-        model.updateRuleHeliumProfileDirectory(id: ruleID, value: "Profile 1")
+        model.updateRuleTargetSelection(
+            id: ruleID,
+            targetSelection: .browser(
+                bundleID: BrowserLauncher.heliumBundleID,
+                applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
+            )
+        )
+        model.updateRuleBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
 
         try await model.testRule(id: ruleID)
 
@@ -486,7 +506,11 @@ final class PreferencesModelTests: XCTestCase {
             [
                 PreferencesBrowserLauncherSpy.OpenCall(
                     url: URL(string: "https://example.com/work")!,
-                    target: .helium(profileDirectory: "Profile 1"),
+                    target: .applicationHeliumProfile(
+                        bundleID: BrowserLauncher.heliumBundleID,
+                        applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                        profileDirectory: "Profile 1"
+                    ),
                     config: RouterConfig(
                         defaultBrowserBundleID: "com.apple.Safari",
                         defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
@@ -495,7 +519,56 @@ final class PreferencesModelTests: XCTestCase {
                             SourceAppRule(
                                 id: ruleID,
                                 sourceBundleID: "com.tinyspeck.slackmacgap",
-                                target: .helium(profileDirectory: "Profile 1")
+                                target: .applicationHeliumProfile(
+                                    bundleID: BrowserLauncher.heliumBundleID,
+                                    applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                                    profileDirectory: "Profile 1"
+                                )
+                            ),
+                        ]
+                    )
+                ),
+            ]
+        )
+    }
+
+    @MainActor
+    func testTestRuleUsesDirectBrowserTarget() async throws {
+        let launcher = PreferencesBrowserLauncherSpy()
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: launcher,
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        model.defaultBrowserBundleID = "com.apple.Safari"
+        model.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+        model.sampleURLString = "https://example.com/direct"
+
+        let chromeURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+        let ruleID = model.addRule()
+        model.updateRuleSourceBundleID(id: ruleID, value: "com.apple.mail")
+        model.updateRuleTargetSelection(
+            id: ruleID,
+            targetSelection: .browser(bundleID: "com.google.Chrome", applicationURL: chromeURL)
+        )
+
+        try await model.testRule(id: ruleID)
+
+        XCTAssertEqual(
+            launcher.openCalls,
+            [
+                PreferencesBrowserLauncherSpy.OpenCall(
+                    url: URL(string: "https://example.com/direct")!,
+                    target: .application(bundleID: "com.google.Chrome", applicationURL: chromeURL),
+                    config: RouterConfig(
+                        defaultBrowserBundleID: "com.apple.Safari",
+                        defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+                        defaultBrowserRoute: .plain,
+                        rules: [
+                            SourceAppRule(
+                                id: ruleID,
+                                sourceBundleID: "com.apple.mail",
+                                target: .application(bundleID: "com.google.Chrome", applicationURL: chromeURL)
                             ),
                         ]
                     )
@@ -520,7 +593,7 @@ final class PreferencesModelTests: XCTestCase {
         model.sampleURLString = "https://example.com/work"
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleDefaultBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
+        model.updateRuleBrowserRoute(id: ruleID, route: .zenContainer(containerName: "Work"))
 
         try await model.testRule(id: ruleID)
 
@@ -563,7 +636,7 @@ final class PreferencesModelTests: XCTestCase {
         model.sampleURLString = "https://example.com/work"
         let ruleID = model.addRule()
         model.updateRuleSourceBundleID(id: ruleID, value: "com.tinyspeck.slackmacgap")
-        model.updateRuleDefaultBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
+        model.updateRuleBrowserRoute(id: ruleID, route: .heliumProfile(profileDirectory: "Profile 1"))
 
         try await model.testRule(id: ruleID)
 
