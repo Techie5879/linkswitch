@@ -2,6 +2,7 @@ import Foundation
 
 enum DefaultBrowserProfileSupport: Equatable {
     case plainOnly
+    /// Chromium-family browsers launched with `--profile-directory=<name>`.
     case heliumProfile
     case firefoxProfile
     case zenContainer
@@ -10,7 +11,7 @@ enum DefaultBrowserProfileSupport: Equatable {
         if bundleID == FirefoxBrowserAppSupportPath.zenBrowserBundleID {
             return .zenContainer
         }
-        if bundleID == BrowserLauncher.heliumBundleID {
+        if ChromiumBrowserAppSupportPath.relativePath(forBundleID: bundleID) != nil {
             return .heliumProfile
         }
         if FirefoxBrowserAppSupportPath.supportsDefaultProfileRouting(forBundleID: bundleID) {

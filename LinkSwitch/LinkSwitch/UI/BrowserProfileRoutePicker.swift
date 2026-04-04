@@ -127,11 +127,11 @@ enum BrowserProfileRoutePicker {
         case .none:
             return BrowserProfileCardLoadResult(displayedProfiles: [], errorMessage: nil, logContext: "none")
         case .browserHeliumProfile, .defaultHeliumProfile:
-            logContext = mode == .defaultHeliumProfile ? "Helium default-browser profile row" : "Helium browser rule profile row"
+            logContext = mode == .defaultHeliumProfile ? "Chromium default-browser profile row" : "Chromium browser rule profile row"
             let factory = BrowserProfileDiscoveryFactory()
             guard let discoverer = factory.makeDiscoverer(forBundleID: browserBundleID) else {
                 AppLogger.error(
-                    "No Helium discoverer available for bundle ID \(browserBundleID)",
+                    "No Chromium discoverer available for bundle ID \(browserBundleID)",
                     category: .app
                 )
                 return BrowserProfileCardLoadResult(

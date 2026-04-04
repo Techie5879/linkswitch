@@ -87,6 +87,41 @@ final class BrowserLauncherTests: XCTestCase {
         XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
     }
 
+    func testOpenDefaultBrowserHeliumProfileLaunchesChromeWithProfileArguments() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let url = URL(string: "https://example.com/default-browser-chrome")!
+        let config = RouterConfig(
+            defaultBrowserBundleID: "com.google.Chrome",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Google Chrome.app"),
+            defaultBrowserRoute: .plain,
+            rules: []
+        )
+
+        try await launcher.open(
+            url,
+            target: .defaultBrowserHeliumProfile(profileDirectory: "Profile 1"),
+            config: config
+        )
+
+        XCTAssertEqual(
+            workspaceLauncher.launchApplicationExecutableCalls,
+            [
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
+                    applicationURL: config.defaultBrowserAppURL,
+                    arguments: [
+                        "--profile-directory=Profile 1",
+                        "https://example.com/default-browser-chrome",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
+    }
+
     func testOpenHeliumResolvesAppURLAndLaunchesWithProfileArguments() async throws {
         let heliumApplicationURL = URL(fileURLWithPath: "/Applications/Helium.app")
         let workspaceLauncher = WorkspaceLaunchSpy()
@@ -148,6 +183,40 @@ final class BrowserLauncherTests: XCTestCase {
                     arguments: [
                         "--profile-directory=Profile 1",
                         "https://example.com/direct-helium",
+                    ]
+                ),
+            ]
+        )
+        XCTAssertTrue(workspaceLauncher.openURLCalls.isEmpty)
+    }
+
+    func testOpenDirectChromeProfileLaunchesSelectedApplicationWithProfileArguments() async throws {
+        let workspaceLauncher = WorkspaceLaunchSpy()
+        let launcher = BrowserLauncher(
+            launchServicesBridge: makeBridge(),
+            workspaceLauncher: workspaceLauncher
+        )
+        let chromeApplicationURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+        let url = URL(string: "https://example.com/direct-chrome")!
+
+        try await launcher.open(
+            url,
+            target: .applicationHeliumProfile(
+                bundleID: "com.google.Chrome",
+                applicationURL: chromeApplicationURL,
+                profileDirectory: "Profile 1"
+            ),
+            config: makeConfig()
+        )
+
+        XCTAssertEqual(
+            workspaceLauncher.launchApplicationExecutableCalls,
+            [
+                WorkspaceLaunchSpy.LaunchApplicationExecutableCall(
+                    applicationURL: chromeApplicationURL,
+                    arguments: [
+                        "--profile-directory=Profile 1",
+                        "https://example.com/direct-chrome",
                     ]
                 ),
             ]

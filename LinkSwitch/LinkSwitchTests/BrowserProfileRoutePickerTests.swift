@@ -9,6 +9,13 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
         )
     }
 
+    func testDefaultBrowserModeUsesDefaultHeliumProfileForChromeBundleID() {
+        XCTAssertEqual(
+            BrowserProfileRouteSelectionMode.mode(forDefaultBrowserBundleID: "com.google.Chrome"),
+            .defaultHeliumProfile
+        )
+    }
+
     func testDefaultBrowserRuleModeUsesDefaultHeliumProfileWhenDefaultBrowserIsHelium() {
         XCTAssertEqual(
             BrowserProfileRouteSelectionMode.mode(
@@ -29,6 +36,19 @@ final class BrowserProfileRoutePickerTests: XCTestCase {
                 defaultBrowserBundleID: "com.apple.Safari"
             ),
             .browserFirefoxProfile
+        )
+    }
+
+    func testExplicitBrowserRuleModeUsesBrowserHeliumProfileForChromeBundleID() {
+        XCTAssertEqual(
+            BrowserProfileRouteSelectionMode.mode(
+                targetSelection: .browser(
+                    bundleID: "com.google.Chrome",
+                    applicationURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")
+                ),
+                defaultBrowserBundleID: "com.apple.Safari"
+            ),
+            .browserHeliumProfile
         )
     }
 
