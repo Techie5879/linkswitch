@@ -60,6 +60,7 @@ sleep 1
 echo "==> Removing previous dev installs"
 rm -rf "${SYSTEM_INSTALL_APP_PATH}"
 rm -rf "${HOME_INSTALL_APP_PATH}"
+rm -rf "${SYSTEM_INSTALL_DIR}/LinkSwitch.app" # This should never be installed for now -- it should just be the dev app that is installed.
 
 echo "==> Replacing installed dev app at ${INSTALL_APP_PATH}"
 ditto "${BUILD_APP_PATH}" "${INSTALL_APP_PATH}"

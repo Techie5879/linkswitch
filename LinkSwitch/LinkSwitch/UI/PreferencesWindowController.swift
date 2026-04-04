@@ -109,7 +109,7 @@ final class PreferencesViewController: NSViewController {
         case customCurrentBrowser = -1
     }
 
-    private static let preferredContentSize = NSSize(width: 820, height: 680)
+    private static let preferredContentSize = NSSize(width: 820, height: 760)
 
     private let model: PreferencesModel
     private let iconProvider = AppIconProvider()
@@ -210,7 +210,7 @@ final class PreferencesViewController: NSViewController {
         window.title = "LinkSwitch"
         window.center()
         window.setContentSize(Self.preferredContentSize)
-        window.minSize = NSSize(width: 700, height: 520)
+        window.minSize = NSSize(width: 700, height: 480)
     }
 
     // MARK: Layout construction
@@ -292,12 +292,7 @@ final class PreferencesViewController: NSViewController {
 
     private func makeHeaderSection() -> NSStackView {
         let titleLabel = makeSectionLabel("Router Config")
-
-        configPathLabel.maximumNumberOfLines = 0
-        configPathLabel.textColor = .secondaryLabelColor
-        configPathLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-
-        let stack = NSStackView(views: [titleLabel, configPathLabel])
+        let stack = NSStackView(views: [titleLabel])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 4
@@ -449,13 +444,7 @@ final class PreferencesViewController: NSViewController {
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        let addButton = makeButton(
-            title: "+ Add Rule",
-            action: #selector(addRule(_:)),
-            accessibilityIdentifier: "preferences.addRuleButton"
-        )
-
-        let row = NSStackView(views: [titleStack, spacer, reloadButton, saveButton, addButton])
+        let row = NSStackView(views: [titleStack, spacer, reloadButton, saveButton])
         row.orientation = .horizontal
         row.alignment = .top
         row.spacing = 8
@@ -507,6 +496,10 @@ final class PreferencesViewController: NSViewController {
         headerRow.alignment = .centerY
         headerRow.spacing = 8
 
+        configPathLabel.maximumNumberOfLines = 0
+        configPathLabel.textColor = .secondaryLabelColor
+        configPathLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+
         rawConfigValidationLabel.maximumNumberOfLines = 0
         rawConfigValidationLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
 
@@ -535,11 +528,11 @@ final class PreferencesViewController: NSViewController {
         rawConfigContentStack.addArrangedSubview(rawConfigValidationLabel)
         rawConfigContentStack.addArrangedSubview(rawConfigScrollView)
 
-        let contentStack = NSStackView(views: [headerRow, rawConfigContentStack])
+        let contentStack = NSStackView(views: [headerRow, configPathLabel, rawConfigContentStack])
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
-        contentStack.spacing = 12
+        contentStack.spacing = 8
 
         rawConfigCard.addSubview(contentStack)
         NSLayoutConstraint.activate([
@@ -548,6 +541,7 @@ final class PreferencesViewController: NSViewController {
             contentStack.topAnchor.constraint(equalTo: rawConfigCard.topAnchor, constant: 16),
             contentStack.bottomAnchor.constraint(equalTo: rawConfigCard.bottomAnchor, constant: -16),
             headerRow.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
+            configPathLabel.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             rawConfigContentStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             rawConfigValidationLabel.widthAnchor.constraint(equalTo: rawConfigContentStack.widthAnchor),
             rawConfigScrollView.widthAnchor.constraint(equalTo: rawConfigContentStack.widthAnchor),
@@ -828,7 +822,6 @@ final class PreferencesViewController: NSViewController {
             emptyLabel.textColor = .secondaryLabelColor
             emptyLabel.font = .systemFont(ofSize: NSFont.systemFontSize)
             rulesStackView.addArrangedSubview(emptyLabel)
-            return
         }
 
         for draft in model.ruleDrafts {
@@ -874,6 +867,18 @@ final class PreferencesViewController: NSViewController {
             rulesStackView.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: rulesStackView.widthAnchor).isActive = true
         }
+
+        let addButton = makeButton(
+            title: "+ Add Rule",
+            action: #selector(addRule(_:)),
+            accessibilityIdentifier: "preferences.addRuleButton"
+        )
+        addButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        let addButtonRow = NSStackView(views: [addButton, NSView()])
+        addButtonRow.orientation = .horizontal
+        addButtonRow.spacing = 0
+        rulesStackView.addArrangedSubview(addButtonRow)
+        addButtonRow.widthAnchor.constraint(equalTo: rulesStackView.widthAnchor).isActive = true
     }
 
     // MARK: Actions
