@@ -17,8 +17,6 @@ Built with Swift and AppKit.
 
 ## Screenshots
 
-<img src="docs/images/menubar-icon.png" alt="LinkSwitch in the menu bar" width="120">
-
 ![Preferences window with a Slack-to-Helium routing rule](docs/images/preferences-window.png)
 
 ## Features
