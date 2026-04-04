@@ -97,6 +97,7 @@ private final class FlippedView: NSView {
 final class PreferencesViewController: NSViewController {
     private enum StatusStyle {
         case normal
+        case success
         case warning
         case error
     }
@@ -177,6 +178,14 @@ final class PreferencesViewController: NSViewController {
     private let rawConfigTextView = NSTextView()
     private var isRawConfigExpanded = false
     private var autoSaveTimer: Timer?
+    private var lastSaveTimestamp: Date?
+    private var saveBadgeCooldownTimer: Timer?
+
+    private static let saveTimestampFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm:ss a"
+        return f
+    }()
 
     private lazy var toggleRawConfigButton: NSButton = makeButton(
         title: "View Raw Config",
@@ -577,8 +586,14 @@ final class PreferencesViewController: NSViewController {
             rawConfigValidationLabel.isHidden = false
             saveButton.isEnabled = false
         } else {
-            rulesInfoLabel.stringValue = "Changes save automatically."
-            rulesInfoLabel.textColor = .secondaryLabelColor
+            if let ts = lastSaveTimestamp {
+                let timeStr = Self.saveTimestampFormatter.string(from: ts)
+                rulesInfoLabel.stringValue = "Saved at \(timeStr)"
+                rulesInfoLabel.textColor = .systemGreen
+            } else {
+                rulesInfoLabel.stringValue = "Changes save automatically."
+                rulesInfoLabel.textColor = .secondaryLabelColor
+            }
             rawConfigValidationLabel.stringValue = ""
             rawConfigValidationLabel.isHidden = true
             saveButton.isEnabled = true
@@ -609,12 +624,25 @@ final class PreferencesViewController: NSViewController {
 
         do {
             try model.save()
+            lastSaveTimestamp = Date()
             refreshRawConfigPreview()
             setStatus("Saved automatically.")
+            scheduleSaveBadgeCooldown()
         } catch {
             AppLogger.error("Auto-save failed: \(error.localizedDescription)", category: .app)
             refreshRawConfigPreview()
             setStatus("Auto-save failed: \(error.localizedDescription)", style: .error)
+        }
+    }
+
+    private func scheduleSaveBadgeCooldown() {
+        saveBadgeCooldownTimer?.invalidate()
+        saveBadgeCooldownTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.lastSaveTimestamp = nil
+                self.refreshRawConfigPreview()
+            }
         }
     }
 
@@ -947,8 +975,10 @@ final class PreferencesViewController: NSViewController {
         syncSampleURLField()
         do {
             try model.save()
+            lastSaveTimestamp = Date()
             refreshRawConfigPreview()
             setStatus("Saved router config to disk.")
+            scheduleSaveBadgeCooldown()
         } catch {
             refreshRawConfigPreview()
             presentPreferencesError(error, message: "Could not save the router config.")
@@ -1052,6 +1082,8 @@ final class PreferencesViewController: NSViewController {
         switch style {
         case .normal:
             statusLabel.textColor = .secondaryLabelColor
+        case .success:
+            statusLabel.textColor = .systemGreen
         case .warning:
             statusLabel.textColor = .systemYellow
         case .error:
