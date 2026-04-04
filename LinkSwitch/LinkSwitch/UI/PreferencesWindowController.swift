@@ -656,6 +656,8 @@ final class PreferencesViewController: NSViewController {
         switch model.fallbackBrowserRoute {
         case .plain:
             return ""
+        case let .heliumProfile(profileDirectory):
+            return profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
         case let .firefoxProfile(profileKey):
             return profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
         case let .zenContainer(containerName):
@@ -697,6 +699,8 @@ final class PreferencesViewController: NSViewController {
         let mode = BrowserProfileRouteSelectionMode.mode(forFallbackBrowserBundleID: model.fallbackBrowserBundleID)
         let route: FallbackBrowserRoute
         switch mode {
+        case .fallbackHeliumProfile:
+            route = profile.profileKey.isEmpty ? .plain : .heliumProfile(profileDirectory: profile.profileKey)
         case .fallbackFirefoxProfile:
             route = profile.profileKey.isEmpty ? .plain : .firefoxProfile(profileKey: profile.profileKey)
         case .fallbackZenContainer:
@@ -1045,6 +1049,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             switch draft.fallbackBrowserRoute {
             case .plain:
                 currentSelectionKey = ""
+            case let .heliumProfile(profileDirectory):
+                currentSelectionKey = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
             case let .firefoxProfile(profileKey):
                 currentSelectionKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
             case let .zenContainer(containerName):
@@ -1488,6 +1494,11 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         switch profileRouteSelectionMode() {
         case .heliumProfile:
             onHeliumProfileDirectoryChange(profile.profileKey)
+        case .fallbackHeliumProfile:
+            let route: FallbackBrowserRoute = profile.profileKey.isEmpty
+                ? .plain
+                : .heliumProfile(profileDirectory: profile.profileKey)
+            onFallbackBrowserRouteChange(route)
         case .fallbackFirefoxProfile:
             let route: FallbackBrowserRoute = profile.profileKey.isEmpty
                 ? .plain

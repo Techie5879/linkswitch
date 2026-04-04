@@ -5,6 +5,7 @@ import Foundation
 enum BrowserProfileRouteSelectionMode: Equatable {
     case none
     case heliumProfile
+    case fallbackHeliumProfile
     case fallbackFirefoxProfile
     case fallbackZenContainer
 
@@ -23,27 +24,30 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     /// Default fallback browser card: only the fallback browser bundle ID matters.
     static func mode(forFallbackBrowserBundleID bundleID: String) -> BrowserProfileRouteSelectionMode {
-        if bundleID == FirefoxBrowserAppSupportPath.zenBrowserBundleID {
+        switch FallbackBrowserProfileSupport.forBundleID(bundleID) {
+        case .plainOnly:
+            return .none
+        case .heliumProfile:
+            return .fallbackHeliumProfile
+        case .firefoxProfile:
+            return .fallbackFirefoxProfile
+        case .zenContainer:
             return .fallbackZenContainer
         }
-        if FirefoxBrowserAppSupportPath.supportsFallbackProfileRouting(forBundleID: bundleID) {
-            return .fallbackFirefoxProfile
-        }
-        return .none
     }
 
     var sectionTitle: String {
         switch self {
         case .fallbackZenContainer:
             return "Container"
-        case .none, .heliumProfile, .fallbackFirefoxProfile:
+        case .none, .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
             return "Profile"
         }
     }
 
     var emptyMessage: String {
         switch self {
-        case .heliumProfile, .fallbackFirefoxProfile:
+        case .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
             return "No profiles were found."
         case .fallbackZenContainer:
             return "No containers were found."
@@ -54,7 +58,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var readFailurePrefix: String {
         switch self {
-        case .heliumProfile, .fallbackFirefoxProfile:
+        case .heliumProfile, .fallbackHeliumProfile, .fallbackFirefoxProfile:
             return "Could not read profiles"
         case .fallbackZenContainer:
             return "Could not read containers"
@@ -65,7 +69,7 @@ enum BrowserProfileRouteSelectionMode: Equatable {
 
     var includesBrowserDefaultCard: Bool {
         switch self {
-        case .fallbackFirefoxProfile, .fallbackZenContainer:
+        case .fallbackHeliumProfile, .fallbackFirefoxProfile, .fallbackZenContainer:
             return true
         case .none, .heliumProfile:
             return false
@@ -118,6 +122,31 @@ enum BrowserProfileRoutePicker {
                 AppLogger.error("\(logContext) discovery failed: \(error)", category: .app)
                 return BrowserProfileCardLoadResult(
                     displayedProfiles: [],
+                    errorMessage: "\(mode.readFailurePrefix): \(error.localizedDescription)",
+                    logContext: logContext
+                )
+            }
+        case .fallbackHeliumProfile:
+            logContext = "Helium fallback profile row"
+            let factory = BrowserProfileDiscoveryFactory()
+            guard let discoverer = factory.makeDiscoverer(forBundleID: fallbackBrowserBundleID) else {
+                AppLogger.error(
+                    "No Helium discoverer available for fallback bundle ID \(fallbackBrowserBundleID)",
+                    category: .app
+                )
+                return BrowserProfileCardLoadResult(
+                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard()],
+                    errorMessage: "Profile discovery is not available for this browser.",
+                    logContext: logContext
+                )
+            }
+            do {
+                let options = try discoverer.discoverProfiles()
+                return finishLoad(mode: mode, discoveredOptions: options, logContext: logContext)
+            } catch {
+                AppLogger.error("\(logContext) discovery failed: \(error)", category: .app)
+                return BrowserProfileCardLoadResult(
+                    displayedProfiles: [BrowserProfileRouteSelectionMode.browserDefaultCard()],
                     errorMessage: "\(mode.readFailurePrefix): \(error.localizedDescription)",
                     logContext: logContext
                 )

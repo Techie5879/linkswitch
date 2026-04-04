@@ -261,6 +261,7 @@ Current shape:
 
 - `RouterConfig` stores `fallbackBrowserRoute`; `RuleEngine` maps no-match / nil-sender to `config.fallbackBrowserRoute.browserTarget`.
 - Preferences include profile/container cards on the fallback browser card when the selected browser supports them; discovery is shared via `BrowserProfileRoutePicker` with source-app rule rows.
+- Helium now uses the same fallback-browser profile capability path as the fallback-browser rule rows: selecting Helium as the fallback browser surfaces Helium profile cards plus `Browser Default`, persists `FallbackBrowserRoute.heliumProfile(profileDirectory:)`, and routes unmatched links through the configured Helium profile.
 - `RouterConfig` decoding treats a missing `fallbackBrowserRoute` key from an older saved config as `.plain`, so persisted configs from before this field existed still load and get rewritten in the new shape after the next save.
 
 ## Source references
