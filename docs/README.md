@@ -10,3 +10,4 @@ Implementation notes for the native macOS link-router app live here.
 - `source-app-resolution.md` - sender-detection approach, limits, and Apple Event notes
 - `helium-launcher.md` - Helium-specific launch assumptions and risks
 - `zen-default-browser-research.md` - research on Zen profile vs container/workspace discovery for default-browser routing
+- `zen-container-handoff.md` - how Zen container routing uses `ext+container:` and what to expect (add-ons, prefs, limits)

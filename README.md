@@ -26,9 +26,11 @@ Built with Swift and AppKit.
 
 - **Source-based routing** — rules match on the bundle ID of the app that opened the link
 - **Profile support** — route to specific Chromium-style work profiles or Firefox/Zen profiles
-- **Zen container support** — hand off to a named Zen container via the `ext+container:` protocol
+- **Zen container handoff** — optional `ext+container:` routing to a named container ([caveats](docs/zen-container-handoff.md))
 - **Menu bar app** — lightweight, always available, out of your way
 - **Explicit config** — plain config file, no magic inference
+
+Zen container routing uses the Firefox ecosystem’s `ext+container:` handoff, not a built-in Zen API. If you use it, read the [short caveat doc](docs/zen-container-handoff.md) first. No Container works best for now (opens in whatever container window you have open)
 
 ## Project structure
 
