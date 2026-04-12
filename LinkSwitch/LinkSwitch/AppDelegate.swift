@@ -11,6 +11,98 @@ private enum LaunchArgument {
     static let showMainWindowForUITests = "--ui-test-show-main-window"
 }
 
+struct RunningAppInstance: Equatable {
+    let processIdentifier: pid_t
+    let bundleURL: URL?
+}
+
+protocol RunningApplicationMonitoring {
+    func runningInstances(bundleIdentifier: String) -> [RunningAppInstance]
+    func terminate(processIdentifier: pid_t) -> Bool
+}
+
+struct AppInstanceCoordinator {
+    func resolve(
+        currentProcessIdentifier: pid_t,
+        currentBundleURL: URL,
+        otherInstances: [RunningAppInstance]
+    ) -> SingleInstanceResolution {
+        let currentInstance = RunningAppInstance(
+            processIdentifier: currentProcessIdentifier,
+            bundleURL: currentBundleURL.standardizedFileURL
+        )
+        let allInstances = [currentInstance] + otherInstances
+
+        guard let preferredInstance = allInstances.min(by: { prefers($0, over: $1) }) else {
+            return .continueRunning(inferiorProcessIdentifiers: [])
+        }
+
+        guard preferredInstance.processIdentifier == currentProcessIdentifier else {
+            return .terminateSelf(preferredProcessIdentifier: preferredInstance.processIdentifier)
+        }
+
+        let inferiorProcessIdentifiers = otherInstances
+            .filter { prefers(currentInstance, over: $0) }
+            .map(\.processIdentifier)
+
+        return .continueRunning(inferiorProcessIdentifiers: inferiorProcessIdentifiers)
+    }
+
+    private func prefers(_ lhs: RunningAppInstance, over rhs: RunningAppInstance) -> Bool {
+        let lhsRank = installationRank(for: lhs.bundleURL)
+        let rhsRank = installationRank(for: rhs.bundleURL)
+
+        if lhsRank != rhsRank {
+            return lhsRank < rhsRank
+        }
+
+        return lhs.processIdentifier < rhs.processIdentifier
+    }
+
+    private func installationRank(for bundleURL: URL?) -> Int {
+        guard let bundleURL else {
+            return 1
+        }
+
+        let standardizedPath = bundleURL.standardizedFileURL.path
+        let homeApplicationsPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications", isDirectory: true)
+            .path
+
+        if standardizedPath.hasPrefix("/Applications/") || standardizedPath.hasPrefix(homeApplicationsPath + "/") {
+            return 0
+        }
+
+        return 1
+    }
+}
+
+enum SingleInstanceResolution: Equatable {
+    case continueRunning(inferiorProcessIdentifiers: [pid_t])
+    case terminateSelf(preferredProcessIdentifier: pid_t)
+}
+
+struct RunningApplicationMonitor: RunningApplicationMonitoring {
+    func runningInstances(bundleIdentifier: String) -> [RunningAppInstance] {
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            .filter { !$0.isTerminated }
+            .map {
+                RunningAppInstance(
+                    processIdentifier: $0.processIdentifier,
+                    bundleURL: $0.bundleURL?.standardizedFileURL
+                )
+            }
+    }
+
+    func terminate(processIdentifier: pid_t) -> Bool {
+        guard let application = NSRunningApplication(processIdentifier: processIdentifier) else {
+            return false
+        }
+
+        return application.terminate()
+    }
+}
+
 private enum StatusItemIcon {
     static func makeTemplateImage() -> NSImage {
         let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
@@ -32,6 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBOutlet var window: NSWindow!
     var sourceBundleIDResolver: any SourceBundleIDResolving = SourceAppResolver()
     var urlIntakeHandler: (any URLIntakeHandling)?
+    var runningApplicationMonitor: any RunningApplicationMonitoring = RunningApplicationMonitor()
     private var preferencesViewController: PreferencesViewController?
     private var mainWindowConfigurationError: (any Error)?
     private var statusItem: NSStatusItem?
@@ -39,6 +132,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         AppLogger.info("Application finished launching", category: .app)
+        guard enforceSingleInstancePolicy() else {
+            return
+        }
+
         wirePreferencesMenuItem()
         configureMainWindowContent()
         installStatusItem()
@@ -233,6 +330,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.orderOut(nil)
         AppLogger.info("Configured status-item-first launch by hiding the main window", category: .app)
+    }
+
+    private func enforceSingleInstancePolicy() -> Bool {
+        if isRunningForXCTest {
+            AppLogger.info("Skipping single-instance enforcement for XCTest-driven launch", category: .app)
+            return true
+        }
+
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
+            AppLogger.error("Bundle identifier was unavailable during startup single-instance check", category: .app)
+            return true
+        }
+
+        let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
+        let currentBundleURL = Bundle.main.bundleURL.standardizedFileURL
+        let otherInstances = runningApplicationMonitor.runningInstances(bundleIdentifier: bundleIdentifier)
+            .filter { $0.processIdentifier != currentProcessIdentifier }
+        let resolution = AppInstanceCoordinator().resolve(
+            currentProcessIdentifier: currentProcessIdentifier,
+            currentBundleURL: currentBundleURL,
+            otherInstances: otherInstances
+        )
+
+        switch resolution {
+        case let .continueRunning(inferiorProcessIdentifiers):
+            for processIdentifier in inferiorProcessIdentifiers {
+                let didRequestTermination = runningApplicationMonitor.terminate(processIdentifier: processIdentifier)
+                if didRequestTermination {
+                    AppLogger.info(
+                        "Continuing preferred instance at \(currentBundleURL.path()) and requesting termination of inferior pid \(processIdentifier)",
+                        category: .app
+                    )
+                } else {
+                    AppLogger.error(
+                        "Preferred instance at \(currentBundleURL.path()) could not request termination of inferior pid \(processIdentifier)",
+                        category: .app
+                    )
+                }
+            }
+            return true
+        case let .terminateSelf(preferredProcessIdentifier):
+            AppLogger.info(
+                "Detected preferred existing instance pid \(preferredProcessIdentifier); terminating current instance at \(currentBundleURL.path())",
+                category: .app
+            )
+            NSApp.terminate(nil)
+            return false
+        }
+    }
+
+    private var isRunningForXCTest: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCInjectBundleInto"] != nil
     }
 
     @objc private func handleWindowWillClose(_ notification: Notification) {

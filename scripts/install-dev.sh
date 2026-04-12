@@ -54,7 +54,7 @@ if [[ "${INSTALL_DIR}" == "${HOME_INSTALL_DIR}" ]]; then
 fi
 
 echo "==> Quitting any running LinkSwitch instance"
-osascript -e "tell application id \"${APP_BUNDLE_ID}\" to quit" >/dev/null 2>&1 || true
+pkill -x LinkSwitch >/dev/null 2>&1 || true
 sleep 1
 
 echo "==> Removing previous dev installs"
@@ -69,7 +69,18 @@ xattr -dr com.apple.quarantine "${INSTALL_APP_PATH}" >/dev/null 2>&1 || true
 if [[ -x "${LSREGISTER}" ]]; then
   echo "==> Registering installed dev app with Launch Services"
   "${LSREGISTER}" -f -R -trusted "${INSTALL_APP_PATH}" >/dev/null
+
+  echo "==> Unregistering stale non-installed LinkSwitch bundles from Launch Services"
+  while IFS= read -r registered_app_path; do
+    [[ -z "${registered_app_path}" ]] && continue
+    if [[ "${registered_app_path}" != "${INSTALL_APP_PATH}" ]]; then
+      "${LSREGISTER}" -u "${registered_app_path}" >/dev/null 2>&1 || true
+    fi
+  done < <(mdfind "kMDItemCFBundleIdentifier == '${APP_BUNDLE_ID}'")
 fi
+
+echo "==> Removing project-local build artifact after install"
+rm -rf "${BUILD_APP_PATH}"
 
 echo "==> Launching installed dev app"
 open "${INSTALL_APP_PATH}"

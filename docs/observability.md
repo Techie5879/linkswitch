@@ -55,6 +55,7 @@ Logging has been added to:
 - status item installation and status-item menu actions in `AppDelegate`
 - main-window hide/show decisions and reopen handling in `AppDelegate`
 - single-window lifecycle close notifications in `AppDelegate`
+- startup single-instance decisions, including preferred-instance selection and inferior-instance termination requests, in `AppDelegate`
 - config path resolution, load, and save in `RouterConfigStore`
 - source-app sender resolution in `SourceAppResolver`
 - route selection in `RuleEngine`
@@ -63,3 +64,9 @@ Logging has been added to:
 - browser forwarding in `BrowserLauncher`
 - URL intake orchestration in `URLIntakeController`
 - Helium launch argument generation in `HeliumLaunchArguments`
+
+Relevant duplicate-instance diagnostics now show up in `logs/runtime.log`, including:
+
+- when singleton enforcement is skipped for XCTest-driven launches
+- when a preferred existing instance causes the current process to terminate itself
+- when the preferred installed app requests termination of inferior running copies

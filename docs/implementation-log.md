@@ -30,7 +30,6 @@ Implemented in:
 - `LinkSwitch/LinkSwitch/Info.plist`
 - `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
 - `LinkSwitch/LinkSwitchUITests/LinkSwitchUITests.swift`
-- `LinkSwitch/LinkSwitchUITests/LinkSwitchUITestsLaunchTests.swift`
 - `docs/app-shell.md`
 
 Current shape:
@@ -42,6 +41,36 @@ Current shape:
 - `Preferences…` presents the app's single main window.
 - `applicationShouldHandleReopen(_:hasVisibleWindows:)` now restores the main window when the app is reopened with no visible windows.
 - UI tests explicitly opt into a visible main window through `--ui-test-show-main-window` instead of relying on the production launch behavior.
+
+### Enforce a single resident app instance and prefer the installed app
+
+Reason:
+
+- macOS was launching multiple physical `LinkSwitch.app` bundles with the same bundle identifier during development.
+- When an older DerivedData copy stayed alive and `/Applications/LinkSwitch Dev.app` launched later through URL handling or login items, both copies installed a menu bar item and the user saw duplicate LinkSwitch icons.
+- The app needed an explicit singleton rule instead of relying on Launch Services to collapse same-bundle-ID launches into one process.
+
+Implemented in:
+
+- `LinkSwitch/LinkSwitch/AppDelegate.swift`
+- `LinkSwitch/LinkSwitchTests/AppDelegateTests.swift`
+- `scripts/install-dev.sh`
+- `docs/app-shell.md`
+
+Current shape:
+
+- `AppDelegate` now resolves all running `dev.helios.LinkSwitch` instances during startup before it installs a status item.
+- Installed app bundles under `/Applications` or `~/Applications` are preferred over DerivedData build outputs.
+- An inferior build artifact terminates itself if a preferred installed copy is already running.
+- A preferred installed copy asks inferior running copies to terminate when it starts.
+- XCTest-driven launches skip singleton enforcement so repeated UI-test launches do not kill each other.
+- `scripts/install-dev.sh` now kills all running `LinkSwitch` processes, unregisters non-installed bundles found by Spotlight, deletes the repo-local build artifact after copying, and relaunches only `/Applications/LinkSwitch Dev.app`.
+
+Verification snapshot:
+
+- After the fix, the full Xcode test suite passed without the slow template launch-screenshot UI tests.
+- The supported day-to-day running app is `/Applications/LinkSwitch Dev.app`.
+- A stale Xcode DerivedData copy may still exist on disk after test or IDE runs, but it should not become a second resident menu bar instance anymore.
 
 ### Use the generated Xcode project as the source tree
 

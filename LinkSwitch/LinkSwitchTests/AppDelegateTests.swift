@@ -81,6 +81,73 @@ final class AppDelegateTests: XCTestCase {
 
         XCTAssertTrue(testWindow.isVisible)
     }
+
+    @MainActor
+    func testAppInstanceCoordinatorPrefersInstalledAppOverBuildArtifacts() {
+        let coordinator = AppInstanceCoordinator()
+
+        let resolution = coordinator.resolve(
+            currentProcessIdentifier: 200,
+            currentBundleURL: URL(fileURLWithPath: "/Applications/LinkSwitch Dev.app"),
+            otherInstances: [
+                RunningAppInstance(
+                    processIdentifier: 100,
+                    bundleURL: URL(fileURLWithPath: "/Users/helios/linkswitch/build/DerivedData/Build/Products/Debug/LinkSwitch.app")
+                ),
+                RunningAppInstance(
+                    processIdentifier: 300,
+                    bundleURL: URL(fileURLWithPath: "/Users/helios/Library/Developer/Xcode/DerivedData/LinkSwitch/Build/Products/Debug/LinkSwitch.app")
+                ),
+            ]
+        )
+
+        XCTAssertEqual(
+            resolution,
+            .continueRunning(inferiorProcessIdentifiers: [100, 300])
+        )
+    }
+
+    @MainActor
+    func testAppInstanceCoordinatorTerminatesBuildArtifactWhenInstalledAppExists() {
+        let coordinator = AppInstanceCoordinator()
+
+        let resolution = coordinator.resolve(
+            currentProcessIdentifier: 300,
+            currentBundleURL: URL(fileURLWithPath: "/Users/helios/linkswitch/build/DerivedData/Build/Products/Debug/LinkSwitch.app"),
+            otherInstances: [
+                RunningAppInstance(
+                    processIdentifier: 200,
+                    bundleURL: URL(fileURLWithPath: "/Applications/LinkSwitch Dev.app")
+                ),
+            ]
+        )
+
+        XCTAssertEqual(
+            resolution,
+            .terminateSelf(preferredProcessIdentifier: 200)
+        )
+    }
+
+    @MainActor
+    func testAppInstanceCoordinatorUsesOldestProcessWhenLocationsTie() {
+        let coordinator = AppInstanceCoordinator()
+
+        let resolution = coordinator.resolve(
+            currentProcessIdentifier: 300,
+            currentBundleURL: URL(fileURLWithPath: "/Users/helios/linkswitch/build/DerivedData/Build/Products/Debug/LinkSwitch.app"),
+            otherInstances: [
+                RunningAppInstance(
+                    processIdentifier: 200,
+                    bundleURL: URL(fileURLWithPath: "/Users/helios/Library/Developer/Xcode/DerivedData/LinkSwitch/Build/Products/Debug/LinkSwitch.app")
+                ),
+            ]
+        )
+
+        XCTAssertEqual(
+            resolution,
+            .terminateSelf(preferredProcessIdentifier: 200)
+        )
+    }
 }
 
 private struct StubSourceBundleIDResolver: SourceBundleIDResolving {
