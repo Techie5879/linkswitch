@@ -52,6 +52,45 @@ final class PreferencesModelTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadPopulatesDomainRuleDraftFromStoredConfig() throws {
+        let ruleID = UUID(uuidString: "99999999-AAAA-BBBB-CCCC-DDDDDDDDDDDD")!
+        let config = RouterConfig(
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
+            domainRules: [
+                DomainRule(
+                    id: ruleID,
+                    domain: "example.com",
+                    target: .defaultBrowser
+                ),
+            ],
+            rules: []
+        )
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: config),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json",
+            browserDiscovery: StubBrowserDiscovering(browsers: []),
+            installedApplicationDiscovery: StubInstalledApplicationDiscovering(applications: [])
+        )
+
+        try model.load()
+
+        XCTAssertEqual(
+            model.domainRuleDrafts,
+            [
+                PreferencesDomainRuleDraft(
+                    id: ruleID,
+                    domain: "example.com",
+                    targetSelection: .defaultBrowser,
+                    browserRoute: .plain
+                ),
+            ]
+        )
+    }
+
+    @MainActor
     func testLoadPopulatesDefaultBrowserFirefoxProfileRuleFromStoredConfig() throws {
         let config = RouterConfig(
             defaultBrowserBundleID: "org.mozilla.firefox",
@@ -320,6 +359,54 @@ final class PreferencesModelTests: XCTestCase {
                     ),
                 ]
             )
+        )
+    }
+
+    @MainActor
+    func testSaveNormalizesAndPersistsDomainRule() throws {
+        let store = PreferencesConfigStoreStub(loadResult: nil)
+        let model = PreferencesModel(
+            configStore: store,
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        let safariURL = try makeApplicationBundle(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        try model.setDefaultBrowser(applicationURL: safariURL)
+        let ruleID = model.addDomainRule()
+        model.updateDomainRuleDomain(id: ruleID, value: "  Docs.Example.COM.  ")
+
+        try model.save()
+
+        XCTAssertEqual(
+            store.savedConfig?.domainRules,
+            [DomainRule(id: ruleID, domain: "docs.example.com", target: .defaultBrowser)]
+        )
+    }
+
+    @MainActor
+    func testConfigValidationRejectsInvalidAndDuplicateDomains() throws {
+        let model = PreferencesModel(
+            configStore: PreferencesConfigStoreStub(loadResult: nil),
+            browserLauncher: PreferencesBrowserLauncherSpy(),
+            configFileURLDescription: "/tmp/router-config.json"
+        )
+        let safariURL = try makeApplicationBundle(name: "Safari", bundleIdentifier: "com.apple.Safari")
+        try model.setDefaultBrowser(applicationURL: safariURL)
+        let firstRuleID = model.addDomainRule()
+        model.updateDomainRuleDomain(id: firstRuleID, value: "https://example.com/path")
+
+        XCTAssertEqual(
+            model.configValidationMessage(),
+            "Domain rule \(firstRuleID.uuidString) has an invalid domain 'https://example.com/path'. Enter a hostname such as example.com."
+        )
+
+        model.updateDomainRuleDomain(id: firstRuleID, value: "EXAMPLE.com")
+        let secondRuleID = model.addDomainRule()
+        model.updateDomainRuleDomain(id: secondRuleID, value: "example.com.")
+
+        XCTAssertEqual(
+            model.configValidationMessage(),
+            "Domain rule \(secondRuleID.uuidString) duplicates the domain 'example.com'."
         )
     }
 

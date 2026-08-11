@@ -166,6 +166,55 @@ final class PreferencesWindowControllerLayoutTests: XCTestCase {
         XCTAssertEqual(popup.titleOfSelectedItem, "Google Chrome")
     }
 
+    func testDomainRuleUsesDomainFieldAndSharedTargetControls() throws {
+        let config = RouterConfig(
+            defaultBrowserBundleID: "com.apple.Safari",
+            defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            defaultBrowserRoute: .plain,
+            domainRules: [
+                DomainRule(
+                    id: UUID(uuidString: "99999999-AAAA-BBBB-CCCC-DDDDDDDDDDDD")!,
+                    domain: "example.com",
+                    target: .application(
+                        bundleID: "com.google.Chrome",
+                        applicationURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")
+                    )
+                ),
+            ],
+            rules: []
+        )
+        let controller = try makeController(
+            config: config,
+            browsers: [
+                DiscoveredBrowser(
+                    bundleID: "com.google.Chrome",
+                    name: "Google Chrome",
+                    appURL: URL(fileURLWithPath: "/Applications/Google Chrome.app")
+                ),
+            ],
+            applications: []
+        )
+
+        let domainField = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSTextField }
+                .first { $0.accessibilityIdentifier() == "preferences.domainRule.domainField" }
+        )
+        let targetPopup = try XCTUnwrap(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSPopUpButton }
+                .first { $0.accessibilityIdentifier() == "preferences.rule.targetBrowserPopup" }
+        )
+
+        XCTAssertEqual(domainField.stringValue, "example.com")
+        XCTAssertEqual(targetPopup.titleOfSelectedItem, "Google Chrome")
+        XCTAssertTrue(
+            allSubviews(in: controller.view)
+                .compactMap { $0 as? NSButton }
+                .contains { $0.accessibilityIdentifier() == "preferences.addDomainRuleButton" }
+        )
+    }
+
     func testOpenAtLoginControlsExistInPreferences() throws {
         let controller = try makeController(
             config: RouterConfig(

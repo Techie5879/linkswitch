@@ -113,7 +113,7 @@ Use this when you are coding or running tests.
 2. Build and run the app with Xcode's default automatic/local signing.
 3. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 4. Choose a default browser.
-5. Add source-app rules as needed.
+5. Add domain and source-app rules as needed.
 6. Use `Test` and `Test Rule` for fast validation.
 
 Use this mode when:
@@ -176,7 +176,7 @@ What the tester should do after install:
 2. Open it once manually.
 3. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 4. Choose the default browser.
-5. Add any source-app rule such as `Slack -> Helium(profile)`.
+5. Add any domain or source-app rule, such as `example.com -> Helium(profile)` or `Slack -> Helium(profile)`.
 6. Save.
 7. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
 
@@ -206,7 +206,7 @@ For a real release, use direct distribution with Developer ID signing and notari
 3. Launch LinkSwitch.
 4. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 5. Choose the default browser.
-6. Add any source-app rules you want.
+6. Add any domain or source-app rules you want.
 7. Save.
 8. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
 
@@ -242,11 +242,11 @@ After any successful install, the setup flow is:
 1. Launch LinkSwitch.
 2. Open LinkSwitch from the LinkSwitch menu bar item. The single window opens directly into preferences.
 3. Choose the default browser.
-4. Add source-app rules.
+4. Add domain or source-app rules.
 5. Save.
 6. Click `Set LinkSwitch as HTTP/HTTPS Handler`.
-7. Verify a matching sender opens the intended browser target.
-8. Verify a non-matching sender opens the configured default browser.
+7. Verify a matching domain or sender opens the intended browser target.
+8. Verify a non-matching link opens the configured default browser.
 
 ## Rollback / Uninstall
 

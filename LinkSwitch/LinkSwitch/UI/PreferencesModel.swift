@@ -34,6 +34,13 @@ struct PreferencesRuleDraft: Equatable {
     var browserRoute: DefaultBrowserRoute
 }
 
+struct PreferencesDomainRuleDraft: Equatable {
+    let id: UUID
+    var domain: String
+    var targetSelection: PreferencesRuleTargetSelection
+    var browserRoute: DefaultBrowserRoute
+}
+
 enum PreferencesModelError: Error, Equatable {
     case missingDefaultBrowserSelection
     case defaultBrowserBundleIdentifierNotFound(applicationURL: URL)
@@ -41,6 +48,8 @@ enum PreferencesModelError: Error, Equatable {
     case invalidSampleURL(String)
     case ruleNotFound(UUID)
     case emptySourceBundleID(UUID)
+    case invalidDomain(UUID, String)
+    case duplicateDomain(UUID, String)
     case emptyRuleChromiumProfile(UUID)
     case emptyRuleFirefoxProfile(UUID)
     case emptyRuleZenContainer(UUID)
@@ -65,6 +74,10 @@ extension PreferencesModelError: LocalizedError {
             return "The selected rule \(ruleID.uuidString) no longer exists."
         case let .emptySourceBundleID(ruleID):
             return "Rule \(ruleID.uuidString) is missing a source app bundle ID."
+        case let .invalidDomain(ruleID, domain):
+            return "Domain rule \(ruleID.uuidString) has an invalid domain '\(domain)'. Enter a hostname such as example.com."
+        case let .duplicateDomain(ruleID, domain):
+            return "Domain rule \(ruleID.uuidString) duplicates the domain '\(domain)'."
         case let .emptyRuleChromiumProfile(ruleID):
             return "Rule \(ruleID.uuidString) is missing a Chromium profile."
         case let .emptyRuleFirefoxProfile(ruleID):
@@ -98,6 +111,7 @@ final class PreferencesModel {
     var defaultBrowserRoute: DefaultBrowserRoute = .plain
     var sampleURLString = "https://example.com"
     private(set) var ruleDrafts: [PreferencesRuleDraft] = []
+    private(set) var domainRuleDrafts: [PreferencesDomainRuleDraft] = []
     private(set) var discoveredBrowsers: [DiscoveredBrowser] = []
     private(set) var discoveredApplications: [DiscoveredApplication] = []
 
@@ -139,6 +153,7 @@ final class PreferencesModel {
             defaultBrowserAppURL = nil
             defaultBrowserRoute = .plain
             ruleDrafts = []
+            domainRuleDrafts = []
             return
         }
 
@@ -146,74 +161,22 @@ final class PreferencesModel {
         defaultBrowserAppURL = config.defaultBrowserAppURL
         defaultBrowserRoute = config.defaultBrowserRoute
         ruleDrafts = config.rules.map { rule in
-            switch rule.target {
-            case .defaultBrowser:
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .defaultBrowser,
-                    browserRoute: .plain
-                )
-            case let .defaultBrowserChromiumProfile(profileDirectory):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .defaultBrowser,
-                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
-                )
-            case let .defaultBrowserFirefoxProfile(profileKey):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .defaultBrowser,
-                    browserRoute: .firefoxProfile(profileKey: profileKey)
-                )
-            case let .defaultBrowserZenContainer(containerName):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .defaultBrowser,
-                    browserRoute: .zenContainer(containerName: containerName)
-                )
-            case let .application(bundleID, applicationURL):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
-                    browserRoute: .plain
-                )
-            case let .applicationChromiumProfile(bundleID, applicationURL, profileDirectory):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
-                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
-                )
-            case let .applicationFirefoxProfile(bundleID, applicationURL, profileKey):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
-                    browserRoute: .firefoxProfile(profileKey: profileKey)
-                )
-            case let .applicationZenContainer(bundleID, applicationURL, containerName):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .browser(bundleID: bundleID, applicationURL: applicationURL),
-                    browserRoute: .zenContainer(containerName: containerName)
-                )
-            case let .helium(profileDirectory):
-                return PreferencesRuleDraft(
-                    id: rule.id,
-                    sourceBundleID: rule.sourceBundleID,
-                    targetSelection: .browser(
-                        bundleID: BrowserLauncher.heliumBundleID,
-                        applicationURL: resolvedKnownApplicationURL(forBundleID: BrowserLauncher.heliumBundleID)
-                    ),
-                    browserRoute: .chromiumProfile(profileDirectory: profileDirectory)
-                )
-            }
+            let targetDraft = preferencesTargetDraft(from: rule.target)
+            return PreferencesRuleDraft(
+                id: rule.id,
+                sourceBundleID: rule.sourceBundleID,
+                targetSelection: targetDraft.selection,
+                browserRoute: targetDraft.route
+            )
+        }
+        domainRuleDrafts = config.domainRules.map { rule in
+            let targetDraft = preferencesTargetDraft(from: rule.target)
+            return PreferencesDomainRuleDraft(
+                id: rule.id,
+                domain: rule.domain,
+                targetSelection: targetDraft.selection,
+                browserRoute: targetDraft.route
+            )
         }
         normalizeDefaultBrowserRuleTargetsForCurrentBrowser()
     }
@@ -241,6 +204,46 @@ final class PreferencesModel {
             return discoveredURL
         }
         return try? launchServicesBridge.applicationURL(forBundleIdentifier: bundleID)
+    }
+
+    private func preferencesTargetDraft(
+        from target: BrowserTarget
+    ) -> (selection: PreferencesRuleTargetSelection, route: DefaultBrowserRoute) {
+        switch target {
+        case .defaultBrowser:
+            return (.defaultBrowser, .plain)
+        case let .defaultBrowserChromiumProfile(profileDirectory):
+            return (.defaultBrowser, .chromiumProfile(profileDirectory: profileDirectory))
+        case let .defaultBrowserFirefoxProfile(profileKey):
+            return (.defaultBrowser, .firefoxProfile(profileKey: profileKey))
+        case let .defaultBrowserZenContainer(containerName):
+            return (.defaultBrowser, .zenContainer(containerName: containerName))
+        case let .application(bundleID, applicationURL):
+            return (.browser(bundleID: bundleID, applicationURL: applicationURL), .plain)
+        case let .applicationChromiumProfile(bundleID, applicationURL, profileDirectory):
+            return (
+                .browser(bundleID: bundleID, applicationURL: applicationURL),
+                .chromiumProfile(profileDirectory: profileDirectory)
+            )
+        case let .applicationFirefoxProfile(bundleID, applicationURL, profileKey):
+            return (
+                .browser(bundleID: bundleID, applicationURL: applicationURL),
+                .firefoxProfile(profileKey: profileKey)
+            )
+        case let .applicationZenContainer(bundleID, applicationURL, containerName):
+            return (
+                .browser(bundleID: bundleID, applicationURL: applicationURL),
+                .zenContainer(containerName: containerName)
+            )
+        case let .helium(profileDirectory):
+            return (
+                .browser(
+                    bundleID: BrowserLauncher.heliumBundleID,
+                    applicationURL: resolvedKnownApplicationURL(forBundleID: BrowserLauncher.heliumBundleID)
+                ),
+                .chromiumProfile(profileDirectory: profileDirectory)
+            )
+        }
     }
 
     func setDefaultBrowser(discoveredBrowser: DiscoveredBrowser) {
@@ -306,6 +309,47 @@ final class PreferencesModel {
         updateRule(id: id) { $0.browserRoute = route }
     }
 
+    @discardableResult
+    func addDomainRule() -> UUID {
+        let ruleID = UUID()
+        domainRuleDrafts.append(
+            PreferencesDomainRuleDraft(
+                id: ruleID,
+                domain: "",
+                targetSelection: .defaultBrowser,
+                browserRoute: .plain
+            )
+        )
+        AppLogger.info("Added preferences domain-rule draft \(ruleID)", category: .config)
+        return ruleID
+    }
+
+    func removeDomainRule(id: UUID) {
+        domainRuleDrafts.removeAll { $0.id == id }
+        AppLogger.info("Removed preferences domain-rule draft \(id)", category: .config)
+    }
+
+    func updateDomainRuleDomain(id: UUID, value: String) {
+        updateDomainRule(id: id) { $0.domain = value }
+    }
+
+    func updateDomainRuleTargetSelection(id: UUID, targetSelection: PreferencesRuleTargetSelection) {
+        updateDomainRule(id: id) { draft in
+            draft.targetSelection = targetSelection
+            let compatibility = switch targetSelection {
+            case .defaultBrowser:
+                defaultBrowserCompatibility(forBundleID: defaultBrowserBundleID)
+            case let .browser(bundleID, _):
+                defaultBrowserCompatibility(forBundleID: bundleID)
+            }
+            draft.browserRoute = normalizedDefaultRoute(draft.browserRoute, compatibility: compatibility)
+        }
+    }
+
+    func updateDomainRuleBrowserRoute(id: UUID, route: DefaultBrowserRoute) {
+        updateDomainRule(id: id) { $0.browserRoute = route }
+    }
+
     func updateDefaultBrowserRoute(_ route: DefaultBrowserRoute) {
         defaultBrowserRoute = route
         AppLogger.info("Updated default browser route to \(route.description)", category: .config)
@@ -359,6 +403,23 @@ final class PreferencesModel {
 
         let target = try makeTarget(for: draft)
         AppLogger.info("Testing preferences rule \(id) with URL \(sampleURL.absoluteString) and target \(target)", category: .launch)
+        try await browserLauncher.open(sampleURL, target: target, config: config)
+    }
+
+    func testDomainRule(id: UUID) async throws {
+        let config = try makeRouterConfig()
+        let sampleURL = try makeSampleURL()
+        guard let draft = domainRuleDrafts.first(where: { $0.id == id }) else {
+            AppLogger.error("Attempted to test missing preferences domain rule \(id)", category: .launch)
+            throw PreferencesModelError.ruleNotFound(id)
+        }
+
+        let target = try makeTarget(
+            id: draft.id,
+            targetSelection: draft.targetSelection,
+            browserRoute: draft.browserRoute
+        )
+        AppLogger.info("Testing preferences domain rule \(id) with URL \(sampleURL.absoluteString) and target \(target)", category: .launch)
         try await browserLauncher.open(sampleURL, target: target, config: config)
     }
 
@@ -427,6 +488,15 @@ final class PreferencesModel {
         mutate(&ruleDrafts[index])
     }
 
+    private func updateDomainRule(id: UUID, mutate: (inout PreferencesDomainRuleDraft) -> Void) {
+        guard let index = domainRuleDrafts.firstIndex(where: { $0.id == id }) else {
+            AppLogger.error("Attempted to update missing preferences domain rule \(id)", category: .config)
+            return
+        }
+
+        mutate(&domainRuleDrafts[index])
+    }
+
     private func makeRouterConfig() throws -> RouterConfig {
         guard let defaultBrowserAppURL else {
             AppLogger.error("Preferences model cannot build config without a default browser selection", category: .config)
@@ -434,6 +504,24 @@ final class PreferencesModel {
         }
 
         let validatedDefaultRoute = try validatedDefaultBrowserRouteForSave(defaultBrowserRoute)
+
+        var seenDomains = Set<String>()
+        let domainRules = try domainRuleDrafts.map { draft in
+            let domain = try normalizedDomain(draft.domain, ruleID: draft.id)
+            guard seenDomains.insert(domain).inserted else {
+                AppLogger.error("Preferences domain rule \(draft.id) duplicated domain \(domain)", category: .config)
+                throw PreferencesModelError.duplicateDomain(draft.id, domain)
+            }
+            return DomainRule(
+                id: draft.id,
+                domain: domain,
+                target: try makeTarget(
+                    id: draft.id,
+                    targetSelection: draft.targetSelection,
+                    browserRoute: draft.browserRoute
+                )
+            )
+        }
 
         let rules = try ruleDrafts.map { draft in
             let trimmedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -453,8 +541,17 @@ final class PreferencesModel {
             defaultBrowserBundleID: defaultBrowserBundleID,
             defaultBrowserAppURL: defaultBrowserAppURL,
             defaultBrowserRoute: validatedDefaultRoute,
+            domainRules: domainRules,
             rules: rules
         )
+    }
+
+    private func normalizedDomain(_ value: String, ruleID: UUID) throws -> String {
+        guard let domain = DomainRulePattern.normalized(value) else {
+            AppLogger.error("Preferences domain rule \(ruleID) had invalid domain '\(value)'", category: .config)
+            throw PreferencesModelError.invalidDomain(ruleID, value)
+        }
+        return domain
     }
 
     private func validatedDefaultBrowserRouteForSave(_ route: DefaultBrowserRoute) throws -> DefaultBrowserRoute {
@@ -486,47 +583,55 @@ final class PreferencesModel {
     }
 
     private func makeTarget(for draft: PreferencesRuleDraft) throws -> BrowserTarget {
-        switch draft.targetSelection {
+        try makeTarget(id: draft.id, targetSelection: draft.targetSelection, browserRoute: draft.browserRoute)
+    }
+
+    private func makeTarget(
+        id: UUID,
+        targetSelection: PreferencesRuleTargetSelection,
+        browserRoute: DefaultBrowserRoute
+    ) throws -> BrowserTarget {
+        switch targetSelection {
         case .defaultBrowser:
-            switch draft.browserRoute {
+            switch browserRoute {
             case .plain:
                 return .defaultBrowser
             case let .chromiumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Chromium profile directory", category: .config)
-                    throw PreferencesModelError.emptyRuleChromiumProfile(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty default-browser Chromium profile directory", category: .config)
+                    throw PreferencesModelError.emptyRuleChromiumProfile(id)
                 }
                 return .defaultBrowserChromiumProfile(profileDirectory: trimmedProfileDirectory)
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty default-browser Firefox profile key", category: .config)
-                    throw PreferencesModelError.emptyRuleFirefoxProfile(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty default-browser Firefox profile key", category: .config)
+                    throw PreferencesModelError.emptyRuleFirefoxProfile(id)
                 }
                 return .defaultBrowserFirefoxProfile(profileKey: trimmedProfileKey)
             case let .zenContainer(containerName):
                 let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedContainerName.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty Zen container name", category: .config)
-                    throw PreferencesModelError.emptyRuleZenContainer(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty Zen container name", category: .config)
+                    throw PreferencesModelError.emptyRuleZenContainer(id)
                 }
                 return .defaultBrowserZenContainer(containerName: trimmedContainerName)
             }
         case let .browser(bundleID, applicationURL):
             let resolvedApplicationURL = try resolvedRuleTargetApplicationURL(
-                draftID: draft.id,
+                draftID: id,
                 bundleID: bundleID,
                 applicationURL: applicationURL
             )
-            switch draft.browserRoute {
+            switch browserRoute {
             case .plain:
                 return .application(bundleID: bundleID, applicationURL: resolvedApplicationURL)
             case let .chromiumProfile(profileDirectory):
                 let trimmedProfileDirectory = profileDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileDirectory.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty Chromium profile directory", category: .config)
-                    throw PreferencesModelError.emptyRuleChromiumProfile(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty Chromium profile directory", category: .config)
+                    throw PreferencesModelError.emptyRuleChromiumProfile(id)
                 }
                 return .applicationChromiumProfile(
                     bundleID: bundleID,
@@ -536,8 +641,8 @@ final class PreferencesModel {
             case let .firefoxProfile(profileKey):
                 let trimmedProfileKey = profileKey.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedProfileKey.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty Firefox profile key", category: .config)
-                    throw PreferencesModelError.emptyRuleFirefoxProfile(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty Firefox profile key", category: .config)
+                    throw PreferencesModelError.emptyRuleFirefoxProfile(id)
                 }
                 return .applicationFirefoxProfile(
                     bundleID: bundleID,
@@ -547,8 +652,8 @@ final class PreferencesModel {
             case let .zenContainer(containerName):
                 let trimmedContainerName = containerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedContainerName.isEmpty else {
-                    AppLogger.error("Preferences rule \(draft.id) had an empty Zen container name", category: .config)
-                    throw PreferencesModelError.emptyRuleZenContainer(draft.id)
+                    AppLogger.error("Preferences rule \(id) had an empty Zen container name", category: .config)
+                    throw PreferencesModelError.emptyRuleZenContainer(id)
                 }
                 return .applicationZenContainer(
                     bundleID: bundleID,
@@ -588,6 +693,25 @@ final class PreferencesModel {
                     category: .config
                 )
                 ruleDrafts[index].browserRoute = normalizedRoute
+            }
+        }
+
+
+        for index in domainRuleDrafts.indices {
+            let compatibility = switch domainRuleDrafts[index].targetSelection {
+            case .defaultBrowser:
+                defaultCompatibility
+            case let .browser(bundleID, _):
+                defaultBrowserCompatibility(forBundleID: bundleID)
+            }
+            let currentRoute = domainRuleDrafts[index].browserRoute
+            let normalizedRoute = normalizedDefaultRoute(currentRoute, compatibility: compatibility)
+            if normalizedRoute != currentRoute {
+                AppLogger.info(
+                    "Normalizing domain rule \(domainRuleDrafts[index].id) from \(currentRoute.description) to \(normalizedRoute.description)",
+                    category: .config
+                )
+                domainRuleDrafts[index].browserRoute = normalizedRoute
             }
         }
     }

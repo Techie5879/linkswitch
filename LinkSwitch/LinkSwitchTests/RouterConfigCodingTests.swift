@@ -7,6 +7,16 @@ final class RouterConfigCodingTests: XCTestCase {
             defaultBrowserBundleID: "com.apple.Safari",
             defaultBrowserAppURL: URL(fileURLWithPath: "/Applications/Safari.app"),
             defaultBrowserRoute: .firefoxProfile(profileKey: "Profiles/personal.default"),
+            domainRules: [
+                DomainRule(
+                    id: UUID(uuidString: "55555555-6666-7777-8888-999999999999")!,
+                    domain: "example.com",
+                    target: .application(
+                        bundleID: "com.apple.Safari",
+                        applicationURL: URL(fileURLWithPath: "/Applications/Safari.app")
+                    )
+                ),
+            ],
             rules: [
                 SourceAppRule(
                     id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
@@ -43,6 +53,22 @@ final class RouterConfigCodingTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RouterConfig.self, from: data)
 
         XCTAssertEqual(decoded, config)
+    }
+
+    func testDecodeExistingConfigWithoutDomainRulesMigratesToEmptyDomainRules() throws {
+        let existingJSONString = """
+        {
+          "defaultBrowserAppURL" : "file:///Applications/Safari.app/",
+          "defaultBrowserBundleID" : "com.apple.Safari",
+          "defaultBrowserRoute" : { "plain" : {} },
+          "rules" : []
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(RouterConfig.self, from: Data(existingJSONString.utf8))
+
+        XCTAssertEqual(decoded.domainRules, [])
+        XCTAssertEqual(decoded.defaultBrowserBundleID, "com.apple.Safari")
     }
 
     func testRoundTripSupportsEmptyRules() throws {

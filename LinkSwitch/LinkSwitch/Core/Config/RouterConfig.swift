@@ -284,9 +284,73 @@ struct SourceAppRule: Codable, Identifiable, Equatable {
     var target: BrowserTarget
 }
 
+struct DomainRule: Codable, Identifiable, Equatable {
+    let id: UUID
+    var domain: String
+    var target: BrowserTarget
+}
+
+enum DomainRulePattern {
+    static func normalized(_ rawValue: String) -> String? {
+        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        while value.hasSuffix(".") {
+            value.removeLast()
+        }
+
+        guard !value.isEmpty, value.count <= 253 else {
+            return nil
+        }
+
+        let hostnamePattern = #"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"#
+        guard value.range(of: hostnamePattern, options: .regularExpression) != nil else {
+            return nil
+        }
+        return value.lowercased()
+    }
+
+    static func matches(host rawHost: String, domain rawDomain: String) -> Bool {
+        guard let host = normalized(rawHost), let domain = normalized(rawDomain) else {
+            return false
+        }
+        return host == domain || host.hasSuffix(".\(domain)")
+    }
+}
+
 struct RouterConfig: Codable, Equatable {
     var defaultBrowserBundleID: String
     var defaultBrowserAppURL: URL
     var defaultBrowserRoute: DefaultBrowserRoute
+    var domainRules: [DomainRule]
     var rules: [SourceAppRule]
+
+    init(
+        defaultBrowserBundleID: String,
+        defaultBrowserAppURL: URL,
+        defaultBrowserRoute: DefaultBrowserRoute,
+        domainRules: [DomainRule] = [],
+        rules: [SourceAppRule]
+    ) {
+        self.defaultBrowserBundleID = defaultBrowserBundleID
+        self.defaultBrowserAppURL = defaultBrowserAppURL
+        self.defaultBrowserRoute = defaultBrowserRoute
+        self.domainRules = domainRules
+        self.rules = rules
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case defaultBrowserBundleID
+        case defaultBrowserAppURL
+        case defaultBrowserRoute
+        case domainRules
+        case rules
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        defaultBrowserBundleID = try container.decode(String.self, forKey: .defaultBrowserBundleID)
+        defaultBrowserAppURL = try container.decode(URL.self, forKey: .defaultBrowserAppURL)
+        defaultBrowserRoute = try container.decode(DefaultBrowserRoute.self, forKey: .defaultBrowserRoute)
+        domainRules = try container.decodeIfPresent([DomainRule].self, forKey: .domainRules) ?? []
+        rules = try container.decode([SourceAppRule].self, forKey: .rules)
+    }
 }

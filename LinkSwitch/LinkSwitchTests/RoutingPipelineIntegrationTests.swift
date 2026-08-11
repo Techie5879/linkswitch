@@ -3,6 +3,58 @@ import XCTest
 
 final class RoutingPipelineIntegrationTests: XCTestCase {
     @MainActor
+    func testSavedPreferencesDomainRuleOverridesSourceRuleEndToEnd() async throws {
+        let temporaryDirectory = try makeTemporaryDirectory()
+        let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)
+        let configStore = RouterConfigStore(configFileURL: configFileURL)
+        let preferencesModel = PreferencesModel(
+            configStore: configStore,
+            browserLauncher: RoutingPipelineBrowserLauncherSpy(),
+            configFileURLDescription: configFileURL.path()
+        )
+        preferencesModel.defaultBrowserBundleID = "com.apple.Safari"
+        preferencesModel.defaultBrowserAppURL = URL(fileURLWithPath: "/Applications/Safari.app")
+
+        let domainRuleID = preferencesModel.addDomainRule()
+        preferencesModel.updateDomainRuleDomain(id: domainRuleID, value: "work.example.com")
+        preferencesModel.updateDomainRuleTargetSelection(
+            id: domainRuleID,
+            targetSelection: .browser(
+                bundleID: BrowserLauncher.heliumBundleID,
+                applicationURL: URL(fileURLWithPath: "/Applications/Helium.app")
+            )
+        )
+        preferencesModel.updateDomainRuleBrowserRoute(
+            id: domainRuleID,
+            route: .chromiumProfile(profileDirectory: "Work")
+        )
+
+        let sourceRuleID = preferencesModel.addRule()
+        preferencesModel.updateRuleSourceBundleID(id: sourceRuleID, value: "com.tinyspeck.slackmacgap")
+        try preferencesModel.save()
+
+        let browserLauncher = RoutingPipelineBrowserLauncherSpy()
+        let intakeController = URLIntakeController(
+            configStore: RouterConfigStore(configFileURL: configFileURL),
+            ruleEngine: RuleEngine(),
+            browserLauncher: browserLauncher
+        )
+        let url = URL(string: "https://docs.work.example.com/plan")!
+
+        try await intakeController.handle(urls: [url], sourceBundleID: "com.tinyspeck.slackmacgap")
+
+        XCTAssertEqual(
+            browserLauncher.openCalls.first?.target,
+            .applicationChromiumProfile(
+                bundleID: BrowserLauncher.heliumBundleID,
+                applicationURL: URL(fileURLWithPath: "/Applications/Helium.app"),
+                profileDirectory: "Work"
+            )
+        )
+        XCTAssertEqual(browserLauncher.openCalls.first?.config.domainRules.first?.id, domainRuleID)
+    }
+
+    @MainActor
     func testSavedPreferencesConfigRoutesMatchingSourceToHelium() async throws {
         let temporaryDirectory = try makeTemporaryDirectory()
         let configFileURL = temporaryDirectory.appendingPathComponent("router-config.json", isDirectory: false)

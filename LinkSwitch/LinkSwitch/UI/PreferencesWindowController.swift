@@ -181,6 +181,7 @@ final class PreferencesViewController: NSViewController {
     // MARK: Misc controls
     private let configPathLabel = NSTextField(wrappingLabelWithString: "")
     private let sampleURLField = NSTextField(string: "")
+    private let domainRulesStackView = NSStackView()
     private let rulesStackView = NSStackView()
     private let rulesInfoLabel = NSTextField(wrappingLabelWithString: "")
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
@@ -282,8 +283,13 @@ final class PreferencesViewController: NSViewController {
         // Two-column cards row
         let topCardsRow = makeTopCardsRow()
 
-        // Rules section
+        // Rules sections
         let rulesSectionHeader = makeRulesSectionHeader()
+
+        domainRulesStackView.orientation = .vertical
+        domainRulesStackView.alignment = .leading
+        domainRulesStackView.spacing = 10
+        domainRulesStackView.translatesAutoresizingMaskIntoConstraints = false
 
         rulesStackView.orientation = .vertical
         rulesStackView.alignment = .leading
@@ -294,7 +300,19 @@ final class PreferencesViewController: NSViewController {
         let footer = makeFooter()
         let rawConfigCard = makeRawConfigCard()
 
-        let rootStack = NSStackView(views: [headerStack, topCardsRow, rulesSectionHeader, rulesStackView, footer, rawConfigCard])
+        let rootStack = NSStackView(
+            views: [
+                headerStack,
+                topCardsRow,
+                rulesSectionHeader,
+                makeRuleTypeLabel("Domain Rules"),
+                domainRulesStackView,
+                makeRuleTypeLabel("Source-App Rules"),
+                rulesStackView,
+                footer,
+                rawConfigCard,
+            ]
+        )
         rootStack.translatesAutoresizingMaskIntoConstraints = false
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
@@ -304,6 +322,7 @@ final class PreferencesViewController: NSViewController {
         NSLayoutConstraint.activate([
             topCardsRow.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             rulesSectionHeader.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            domainRulesStackView.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             rulesStackView.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             footer.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
             rawConfigCard.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
@@ -461,7 +480,7 @@ final class PreferencesViewController: NSViewController {
     // MARK: Rules section header
 
     private func makeRulesSectionHeader() -> NSStackView {
-        let titleLabel = makeSectionLabel("Source-App Rules")
+        let titleLabel = makeSectionLabel("Routing Rules")
         rulesInfoLabel.maximumNumberOfLines = 0
         rulesInfoLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         rulesInfoLabel.textColor = .secondaryLabelColor
@@ -480,6 +499,13 @@ final class PreferencesViewController: NSViewController {
         row.alignment = .top
         row.spacing = 8
         return row
+    }
+
+    private func makeRuleTypeLabel(_ title: String) -> NSTextField {
+        let label = NSTextField(labelWithString: title)
+        label.font = .boldSystemFont(ofSize: NSFont.systemFontSize)
+        label.textColor = .secondaryLabelColor
+        return label
     }
 
     // MARK: Footer
@@ -595,6 +621,7 @@ final class PreferencesViewController: NSViewController {
         refreshHandlerStatusDisplay()
         refreshOpenAtLoginDisplay()
 
+        refreshDomainRules()
         refreshRules()
         refreshRawConfigPreview()
     }
@@ -614,7 +641,7 @@ final class PreferencesViewController: NSViewController {
                 rulesInfoLabel.stringValue = "Saved at \(timeStr)"
                 rulesInfoLabel.textColor = .systemGreen
             } else {
-                rulesInfoLabel.stringValue = "Changes save automatically."
+                rulesInfoLabel.stringValue = "Domain rules win over source-app rules. The most specific matching domain wins. Changes save automatically."
                 rulesInfoLabel.textColor = .secondaryLabelColor
             }
             rawConfigValidationLabel.stringValue = ""
@@ -904,13 +931,15 @@ final class PreferencesViewController: NSViewController {
 
         for draft in model.ruleDrafts {
             let row = PreferencesRuleRowView(
-                draft: draft,
+                match: .sourceApp(bundleID: draft.sourceBundleID),
+                targetSelection: draft.targetSelection,
+                browserRoute: draft.browserRoute,
                 discoveredApplications: model.discoveredApplications,
                 discoveredBrowsers: model.discoveredBrowsers,
                 iconProvider: iconProvider,
                 defaultBrowserBundleID: model.defaultBrowserBundleID,
                 defaultBrowserAppURL: model.defaultBrowserAppURL,
-                onSourceBundleIDChange: { [weak self] value in
+                onMatchValueChange: { [weak self] value in
                     self?.model.updateRuleSourceBundleID(id: draft.id, value: value)
                     self?.refreshRawConfigPreview()
                     self?.scheduleAutoSave()
@@ -953,6 +982,71 @@ final class PreferencesViewController: NSViewController {
         addButtonRow.spacing = 0
         rulesStackView.addArrangedSubview(addButtonRow)
         addButtonRow.widthAnchor.constraint(equalTo: rulesStackView.widthAnchor).isActive = true
+    }
+
+    private func refreshDomainRules() {
+        domainRulesStackView.arrangedSubviews.forEach { view in
+            domainRulesStackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        if model.domainRuleDrafts.isEmpty {
+            let emptyLabel = NSTextField(wrappingLabelWithString: "No domain rules configured yet. Add one to route a site and all of its subdomains.")
+            emptyLabel.textColor = .secondaryLabelColor
+            emptyLabel.font = .systemFont(ofSize: NSFont.systemFontSize)
+            domainRulesStackView.addArrangedSubview(emptyLabel)
+        }
+
+        for draft in model.domainRuleDrafts {
+            let row = PreferencesRuleRowView(
+                match: .domain(draft.domain),
+                targetSelection: draft.targetSelection,
+                browserRoute: draft.browserRoute,
+                discoveredApplications: model.discoveredApplications,
+                discoveredBrowsers: model.discoveredBrowsers,
+                iconProvider: iconProvider,
+                defaultBrowserBundleID: model.defaultBrowserBundleID,
+                defaultBrowserAppURL: model.defaultBrowserAppURL,
+                onMatchValueChange: { [weak self] value in
+                    self?.model.updateDomainRuleDomain(id: draft.id, value: value)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
+                },
+                onSourcePickerNeedsUIRefresh: {},
+                onTargetSelectionChange: { [weak self] selection in
+                    self?.model.updateDomainRuleTargetSelection(id: draft.id, targetSelection: selection)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
+                },
+                onBrowserRouteChange: { [weak self] route in
+                    self?.model.updateDomainRuleBrowserRoute(id: draft.id, route: route)
+                    self?.refreshRawConfigPreview()
+                    self?.scheduleAutoSave()
+                },
+                onRemove: { [weak self] in
+                    self?.model.removeDomainRule(id: draft.id)
+                    self?.refreshUI()
+                    self?.scheduleAutoSave()
+                    self?.setStatus("Removed domain rule.")
+                },
+                onTest: { [weak self] in
+                    self?.testDomainRule(id: draft.id)
+                }
+            )
+            domainRulesStackView.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: domainRulesStackView.widthAnchor).isActive = true
+        }
+
+        let addButton = makeButton(
+            title: "+ Add Domain Rule",
+            action: #selector(addDomainRule(_:)),
+            accessibilityIdentifier: "preferences.addDomainRuleButton"
+        )
+        addButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        let addButtonRow = NSStackView(views: [addButton, NSView()])
+        addButtonRow.orientation = .horizontal
+        domainRulesStackView.addArrangedSubview(addButtonRow)
+        addButtonRow.widthAnchor.constraint(equalTo: domainRulesStackView.widthAnchor).isActive = true
     }
 
     // MARK: Actions
@@ -1006,6 +1100,13 @@ final class PreferencesViewController: NSViewController {
         refreshUI()
         scheduleAutoSave()
         setStatus("Added new rule.")
+    }
+
+    @objc private func addDomainRule(_ sender: Any?) {
+        _ = model.addDomainRule()
+        refreshUI()
+        scheduleAutoSave()
+        setStatus("Added new domain rule.")
     }
 
     @objc private func reloadPreferences(_ sender: Any?) {
@@ -1145,6 +1246,18 @@ final class PreferencesViewController: NSViewController {
         }
     }
 
+    private func testDomainRule(id: UUID) {
+        syncSampleURLField()
+        Task { @MainActor [weak self] in
+            do {
+                try await self?.model.testDomainRule(id: id)
+                self?.setStatus("Opened the sample URL with the domain rule.")
+            } catch {
+                self?.presentPreferencesError(error, message: "Could not test the selected domain rule.")
+            }
+        }
+    }
+
     // MARK: Helpers
 
     private func syncSampleURLField() {
@@ -1208,6 +1321,20 @@ final class PreferencesViewController: NSViewController {
     }
 }
 
+private enum PreferencesRuleMatch {
+    case sourceApp(bundleID: String)
+    case domain(String)
+
+    var value: String {
+        switch self {
+        case let .sourceApp(bundleID):
+            return bundleID
+        case let .domain(domain):
+            return domain
+        }
+    }
+}
+
 // MARK: - PreferencesRuleRowView
 
 @MainActor
@@ -1230,6 +1357,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     }
 
     private let sourceAppPopUpButton: NSPopUpButton
+    private let domainField: NSTextField
     private let manualBundleIDField: NSTextField
     private let manualBundleIDLabel: NSTextField
     private let manualBundleIDStack: NSStackView
@@ -1245,14 +1373,14 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private var currentSelectionKey: String
     private var currentTargetSelection: PreferencesRuleTargetSelection
 
-    private let draft: PreferencesRuleDraft
+    private let match: PreferencesRuleMatch
     private let discoveredApplications: [DiscoveredApplication]
     private let discoveredBrowsers: [DiscoveredBrowser]
     private let iconProvider: AppIconProvider
     private let defaultBrowserBundleID: String
     private var defaultBrowserAppURL: URL?
 
-    private let onSourceBundleIDChange: (String) -> Void
+    private let onMatchValueChange: (String) -> Void
     private let onSourcePickerNeedsUIRefresh: () -> Void
     private let onTargetSelectionChange: (PreferencesRuleTargetSelection) -> Void
     private let onBrowserRouteChange: (DefaultBrowserRoute) -> Void
@@ -1264,35 +1392,37 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     private var lastAppliedSourceBundleID: String
 
     init(
-        draft: PreferencesRuleDraft,
+        match: PreferencesRuleMatch,
+        targetSelection: PreferencesRuleTargetSelection,
+        browserRoute: DefaultBrowserRoute,
         discoveredApplications: [DiscoveredApplication],
         discoveredBrowsers: [DiscoveredBrowser],
         iconProvider: AppIconProvider,
         defaultBrowserBundleID: String,
         defaultBrowserAppURL: URL?,
-        onSourceBundleIDChange: @escaping (String) -> Void,
+        onMatchValueChange: @escaping (String) -> Void,
         onSourcePickerNeedsUIRefresh: @escaping () -> Void,
         onTargetSelectionChange: @escaping (PreferencesRuleTargetSelection) -> Void,
         onBrowserRouteChange: @escaping (DefaultBrowserRoute) -> Void,
         onRemove: @escaping () -> Void,
         onTest: @escaping () -> Void
     ) {
-        self.draft = draft
+        self.match = match
         self.discoveredApplications = discoveredApplications
         self.discoveredBrowsers = discoveredBrowsers
         self.iconProvider = iconProvider
         self.defaultBrowserBundleID = defaultBrowserBundleID
         self.defaultBrowserAppURL = defaultBrowserAppURL
-        self.onSourceBundleIDChange = onSourceBundleIDChange
+        self.onMatchValueChange = onMatchValueChange
         self.onSourcePickerNeedsUIRefresh = onSourcePickerNeedsUIRefresh
         self.onTargetSelectionChange = onTargetSelectionChange
         self.onBrowserRouteChange = onBrowserRouteChange
         self.onRemove = onRemove
         self.onTest = onTest
 
-        lastAppliedSourceBundleID = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentTargetSelection = draft.targetSelection
-        switch draft.browserRoute {
+        lastAppliedSourceBundleID = match.value.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentTargetSelection = targetSelection
+        switch browserRoute {
         case .plain:
             currentSelectionKey = ""
         case let .chromiumProfile(profileDirectory):
@@ -1304,7 +1434,8 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         }
 
         sourceAppPopUpButton = NSPopUpButton()
-        manualBundleIDField = NSTextField(string: draft.sourceBundleID)
+        domainField = NSTextField(string: match.value)
+        manualBundleIDField = NSTextField(string: match.value)
         manualBundleIDLabel = NSTextField(labelWithString: "Bundle ID:")
         manualBundleIDLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         manualBundleIDLabel.textColor = .secondaryLabelColor
@@ -1340,12 +1471,21 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         layer?.cornerRadius = 8
         layer?.borderWidth = 1
 
-        buildLayout(draft: draft)
-        populateSourceMenu()
+        buildLayout()
+        if case .sourceApp = match {
+            populateSourceMenu()
+        }
         populateTargetMenu()
-        applyManualFieldVisibilityForInitialState()
-        updateSourceIcon(bundleID: draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines))
-        updateTargetIcon(targetSelection: draft.targetSelection)
+        switch match {
+        case let .sourceApp(bundleID):
+            applyManualFieldVisibilityForInitialState()
+            updateSourceIcon(bundleID: bundleID.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .domain:
+            manualBundleIDStack.isHidden = true
+            sourceIconView.image = NSImage(systemSymbolName: "globe", accessibilityDescription: "Domain")
+            sourceIconView.contentTintColor = .secondaryLabelColor
+        }
+        updateTargetIcon(targetSelection: targetSelection)
         refreshProfilePresentation()
         if profileRouteSelectionMode() != .none {
             refreshProfileCards()
@@ -1371,7 +1511,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         placeholder.tag = SourcePopupTag.selectPlaceholder
         menu.addItem(placeholder)
 
-        let trimmed = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = match.value.trimmingCharacters(in: .whitespacesAndNewlines)
         let matchIndex = discoveredApplications.firstIndex(where: { $0.bundleID == trimmed })
 
         if !trimmed.isEmpty, matchIndex == nil {
@@ -1406,7 +1546,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
     }
 
     private func applyManualFieldVisibilityForInitialState() {
-        let trimmed = draft.sourceBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = match.value.trimmingCharacters(in: .whitespacesAndNewlines)
         let inList = discoveredApplications.contains(where: { $0.bundleID == trimmed })
         manualBundleIDField.stringValue = trimmed
         manualBundleIDStack.isHidden = trimmed.isEmpty || inList
@@ -1486,7 +1626,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
 
     // MARK: Layout
 
-    private func buildLayout(draft: PreferencesRuleDraft) {
+    private func buildLayout() {
         sourceAppPopUpButton.target = self
         sourceAppPopUpButton.action = #selector(sourcePopupChanged(_:))
         sourceAppPopUpButton.setAccessibilityIdentifier("preferences.rule.sourceAppPopup")
@@ -1495,7 +1635,17 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         manualBundleIDField.delegate = self
         manualBundleIDField.setAccessibilityIdentifier("preferences.rule.sourceBundleIDField")
 
-        let sourcePickerRow = NSStackView(views: [sourceIconView, sourceAppPopUpButton])
+        domainField.placeholderString = "example.com"
+        domainField.delegate = self
+        domainField.setAccessibilityIdentifier("preferences.domainRule.domainField")
+
+        let matchEditor: NSView = switch match {
+        case .sourceApp:
+            sourceAppPopUpButton
+        case .domain:
+            domainField
+        }
+        let sourcePickerRow = NSStackView(views: [sourceIconView, matchEditor])
         sourcePickerRow.orientation = .horizontal
         sourcePickerRow.alignment = .centerY
         sourcePickerRow.spacing = 8
@@ -1566,6 +1716,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             targetIconView.widthAnchor.constraint(equalToConstant: 24),
             targetIconView.heightAnchor.constraint(equalToConstant: 24),
             sourceAppPopUpButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+            domainField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             targetBrowserPopupButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             manualBundleIDField.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
             profileCardsStack.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
@@ -1693,7 +1844,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
             let app = discoveredApplications[tag]
             manualBundleIDStack.isHidden = true
             lastAppliedSourceBundleID = app.bundleID
-            onSourceBundleIDChange(app.bundleID)
+            onMatchValueChange(app.bundleID)
             updateSourceIcon(bundleID: app.bundleID)
             AppLogger.info("Source rule row: selected installed app \(app.bundleID) (\(app.name))", category: .app)
         }
@@ -1720,7 +1871,7 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
                     self.populateSourceMenu()
                     return
                 }
-                self.onSourceBundleIDChange(bundleID)
+                self.onMatchValueChange(bundleID)
                 self.onSourcePickerNeedsUIRefresh()
                 AppLogger.info("Source rule row: set source app from Finder to \(bundleID)", category: .app)
             } else {
@@ -1738,12 +1889,14 @@ private final class PreferencesRuleRowView: NSView, NSTextFieldDelegate {
         if textField === manualBundleIDField {
             let bundleID = textField.stringValue
             lastAppliedSourceBundleID = bundleID
-            onSourceBundleIDChange(bundleID)
+            onMatchValueChange(bundleID)
 
             iconUpdateTimer?.invalidate()
             iconUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
                 self?.updateSourceIcon(bundleID: bundleID.trimmingCharacters(in: .whitespacesAndNewlines))
             }
+        } else if textField === domainField {
+            onMatchValueChange(textField.stringValue)
         }
     }
 
@@ -1863,4 +2016,3 @@ private final class DefaultBrowserAccessibilityPopUpButton: NSPopUpButton {
         setAccessibilityIdentifier("preferences.defaultBrowserPopup")
     }
 }
-
